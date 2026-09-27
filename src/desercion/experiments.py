@@ -31,8 +31,9 @@ from desercion.models import ModelSpec, build_pipeline, get_specs
 
 log = logging.getLogger(__name__)
 
-# Configuración fija de LightGBM para experimentos (la más elegida en la CV anidada preliminar).
-LGBM_FIXED = dict(n_estimators=300, num_leaves=31, learning_rate=0.05, subsample=0.8,
+# Configuración fija de LightGBM para experimentos (la elegida en todos los pliegues de la CV anidada
+# con la rejilla inicial).
+LGBM_FIXED = dict(n_estimators=300, num_leaves=15, learning_rate=0.05, subsample=0.8,
                   subsample_freq=1, colsample_bytree=0.8, verbose=-1)
 
 
@@ -69,6 +70,31 @@ def resampling_comparison(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
                          "f1_ponderado": f1_score(yv, pred, average="weighted"),
                          "recall_desercion": recall_score(yv, pred)})
         log.info("Balanceo %s listo", name)
+    return pd.DataFrame(rows)
+
+
+def balancing_best_model(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
+    """¿Aporta SMOTE al mejor modelo? LightGBM sin balanceo, con pesos de clase y con SMOTE.
+
+    Se mide con métricas independientes del umbral (PR-AUC, ROC-AUC): el balanceo puede
+    desplazar las probabilidades sin mejorar la capacidad de ordenar a los estudiantes por riesgo.
+    """
+    seed = config.seed()
+    num, cat = feature_lists(scenario)
+    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
+    variants = {
+        "Sin balanceo": ({}, None),
+        "Pesos de clase": ({"class_weight": "balanced"}, None),
+        "SMOTE": ({}, SMOTE(random_state=seed)),
+    }
+    rows = []
+    for name, (extra, sampler) in variants.items():
+        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
+            pipe = build_pipeline(_lgbm_spec(seed, **extra), num, cat, sampler=sampler)
+            s = pipe.fit(X.iloc[tr], y.iloc[tr]).predict_proba(X.iloc[va])[:, 1]
+            yv = y.iloc[va].to_numpy()
+            rows.append({"tecnica": name, "pliegue": k, "pr_auc": average_precision_score(yv, s),
+                         "roc_auc": roc_auc_score(yv, s), "prob_media": float(s.mean())})
     return pd.DataFrame(rows)
 
 
@@ -203,6 +229,26 @@ def multiclass(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
                          "f1_ponderado": f1_score(yv, pred, average="weighted", zero_division=0),
                          "f1_macro": f1_score(yv, pred, average="macro", zero_division=0)})
         log.info("Multiclase %s listo", name)
+    return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------- 7. Curva de validación
+def validation_curve_lgbm(dev: pd.DataFrame, scenario: str,
+                          leaves: tuple[int, ...] = (2, 4, 8, 15, 31, 63, 127)) -> pd.DataFrame:
+    """PR-AUC de entrenamiento y validación de LightGBM según su complejidad (número de hojas)."""
+    seed = config.seed()
+    num, cat = feature_lists(scenario)
+    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
+    rows = []
+    for n_leaves in leaves:
+        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
+            pipe = build_pipeline(_lgbm_spec(seed, num_leaves=n_leaves), num, cat)
+            pipe.fit(X.iloc[tr], y.iloc[tr])
+            for part, idx in (("entrenamiento", tr), ("validación", va)):
+                s = pipe.predict_proba(X.iloc[idx])[:, 1]
+                rows.append({"num_leaves": n_leaves, "pliegue": k, "parte": part,
+                             "pr_auc": average_precision_score(y.iloc[idx], s)})
+        log.info("Curva de validación %s | %d hojas lista", scenario, n_leaves)
     return pd.DataFrame(rows)
 
 

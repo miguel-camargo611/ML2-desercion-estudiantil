@@ -129,6 +129,8 @@ def cmd_experiments(args) -> None:
         experiments.vif(dev, s).to_csv(t / f"vif_{s}.csv", index=False)
         experiments.ablation(dev, s).to_csv(t / f"ablacion_{s}.csv", index=False)
         experiments.isolation_forest(dev, s).to_csv(t / f"isolation_forest_{s}.csv", index=False)
+        experiments.validation_curve_lgbm(dev, s).to_csv(t / f"curva_validacion_{s}.csv", index=False)
+        experiments.balancing_best_model(dev, s).to_csv(t / f"balanceo_lgbm_{s}.csv", index=False)
         if s == "A":
             experiments.resampling_comparison(dev, s).to_csv(t / "balanceo_A.csv", index=False)
             experiments.leakage_demo(dev, s).to_csv(t / "fuga_smote_A.csv", index=False)
@@ -191,6 +193,10 @@ def cmd_figures(args) -> None:
            if (t / f"ablacion_{s}.csv").exists()}
     if abl:
         plots.ablation(abl, f / "fig06_ablacion.png")
+    vc = {s: pd.read_csv(t / f"curva_validacion_{s}.csv") for s in args.scenarios
+          if (t / f"curva_validacion_{s}.csv").exists()}
+    if vc:
+        plots.validation_curve(vc, f / "fig09_curva_validacion.png")
     shp = {s: pd.read_csv(t / f"shap_{s}.csv", index_col=0) for s in args.scenarios
            if (t / f"shap_{s}.csv").exists()}
     if shp:

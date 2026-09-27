@@ -92,7 +92,7 @@ def get_specs(seed: int | None = None) -> dict[str, ModelSpec]:
             "LightGBM", "Boosting",
             LGBMClassifier(n_estimators=300, subsample=0.8, subsample_freq=1,
                            colsample_bytree=0.8, n_jobs=_n_jobs(), random_state=seed, verbose=-1),
-            grid={"clf__num_leaves": [15, 31], "clf__learning_rate": [0.05, 0.1]},
+            grid={"clf__num_leaves": [4, 8, 15, 31], "clf__learning_rate": [0.02, 0.05]},
         ),
         ModelSpec(
             "CatBoost", "Boosting",

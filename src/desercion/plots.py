@@ -27,6 +27,11 @@ plt.rcParams.update({
 })
 
 
+def _num(v: float, d: int = 2) -> str:
+    """Formato numérico en español (coma decimal)."""
+    return f"{v:.{d}f}".replace(".", ",")
+
+
 def _save(fig, path: Path) -> Path:
     fig.savefig(path)
     plt.close(fig)
@@ -40,10 +45,11 @@ def target_by_cohort(df: pd.DataFrame, path: Path) -> Path:
     ax = axes[0]
     ax.bar(rate.index, rate.values, color=BLUE, width=0.6)
     for x, v in zip(rate.index, rate.values, strict=True):
-        ax.text(x, v + 0.15, f"{v:.1f}", ha="center", va="bottom", fontsize=8, color=INK2)
+        ax.text(x, v + 0.15, _num(v, 1), ha="center", va="bottom", fontsize=8, color=INK2)
     mean = df["desercion"].mean() * 100
     ax.axhline(mean, color=GRAY, ls="--", lw=1)
-    ax.text(len(rate) - 0.5, mean + 0.9, f"promedio {mean:.1f}", ha="right", fontsize=7, color=INK2)
+    ax.set_ylim(0, 12.2)
+    ax.text(len(rate) - 0.6, 11.6, f"– – promedio {_num(mean, 1)}", ha="right", fontsize=7, color=INK2)
     ax.set_ylabel("Deserción en el primer año (%)")
     ax.set_title("(a) Tasa de deserción por cohorte")
     ax.grid(axis="x", visible=False)
@@ -139,7 +145,7 @@ def leakage(demo: pd.DataFrame, path: Path) -> Path:
         vals = mean.loc[proto].values
         ax.bar(x + (i - 0.5) * (w + 0.02), vals, width=w, color=c, label=proto)
         for xi, v in zip(x, vals, strict=True):
-            ax.text(xi + (i - 0.5) * (w + 0.02), v + 0.01, f"{v:.2f}", ha="center", fontsize=7,
+            ax.text(xi + (i - 0.5) * (w + 0.02), v + 0.01, _num(v), ha="center", fontsize=7,
                     color=INK2)
     ax.set_xticks(x, [c.removeprefix("f1_").replace("_", " ").capitalize() for c in cols])
     ax.set_ylabel("F1 (media 5 pliegues)")
@@ -158,13 +164,34 @@ def ablation(abl: dict[str, pd.DataFrame], path: Path) -> Path:
         ax.barh(y, g["mean"], xerr=g["std"], color=BLUE, height=0.6,
                 error_kw={"ecolor": INK2, "lw": 1, "capsize": 2})
         for yi, v in zip(y, g["mean"], strict=True):
-            ax.text(v + 0.02, yi, f"{v:.2f}", va="center", fontsize=7, color=INK2)
+            ax.text(v + 0.02, yi, _num(v), va="center", fontsize=7, color=INK2)
         ax.set_yticks(y, g.index)
         ax.invert_yaxis()
         ax.set_xlim(0, max(0.8, g["mean"].max() + 0.12))
         ax.set_xlabel("PR-AUC (LightGBM)")
         ax.set_title(f"Escenario {s}")
         ax.grid(axis="y", visible=False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def validation_curve(curves: dict[str, pd.DataFrame], path: Path) -> Path:
+    fig, axes = plt.subplots(1, len(curves), figsize=(7.2, 2.6), sharey=False)
+    axes = np.atleast_1d(axes)
+    for ax, (s, c) in zip(axes, curves.items(), strict=True):
+        g = c.groupby(["parte", "num_leaves"])["pr_auc"].agg(["mean", "std"]).reset_index()
+        for part, color in (("entrenamiento", GRAY), ("validación", BLUE)):
+            d = g[g.parte == part]
+            ax.plot(d.num_leaves, d["mean"], color=color, lw=2, marker="o", ms=4, label=part.capitalize())
+            ax.fill_between(d.num_leaves, d["mean"] - d["std"], d["mean"] + d["std"], color=color,
+                            alpha=0.15, lw=0)
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(sorted(c.num_leaves.unique()), [str(v) for v in sorted(c.num_leaves.unique())])
+        ax.minorticks_off()
+        ax.set_xlabel("Hojas por árbol (LightGBM)")
+        ax.set_ylabel("PR-AUC")
+        ax.set_title(f"Escenario {s}")
+        ax.legend(fontsize=7)
     fig.tight_layout()
     return _save(fig, path)
 

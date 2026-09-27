@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "nbformat", "nbconvert", "ipykernel"]
+dev = ["pytest>=8", "ruff>=0.6", "nbformat", "nbconvert", "nbclient", "jupyter_core", "ipykernel"]
 
 [project.scripts]
 desercion = "desercion.cli:main"
