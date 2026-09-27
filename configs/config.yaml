@@ -1,0 +1,33 @@
+# Configuración central del proyecto. Todas las rutas son relativas a la raíz del repo.
+seed: 42
+
+paths:
+  raw_data: "data/raw/2022-03-16 dataset on student dropout .xlsx"
+  interim_data: data/interim/students.parquet
+  split: data/processed/split.parquet
+  processed_dir: data/processed
+  models_dir: models
+  figures_dir: reports/figures
+  tables_dir: reports/tables
+  report_figures_dir: Segunda_entrega/figuras
+
+# Población de estudio: solo pregrado (educación superior, como en el artículo base).
+population:
+  level: Undergraduate
+
+# Escenario B: cohortes que tienen desempeño del primer periodo (AD19, AD20).
+first_period_generations: [AD19, AD20]
+
+split:
+  test_size: 0.20          # conjunto de prueba sellado hasta la Entrega final
+
+cv:
+  outer_folds: 5           # validación cruzada externa (estimación del desempeño)
+  inner_folds: 3           # validación cruzada interna (ajuste de hiperparámetros)
+  threshold_folds: 3       # validación interna para calibrar el umbral de decisión
+
+metrics:
+  tuning: average_precision   # métrica para GridSearchCV (independiente del umbral)
+  threshold_beta: 2           # F-beta para fijar el umbral: el recall pesa el doble
+
+onehot_min_frequency: 30      # categorías con menos registros se agrupan como "infrecuentes"

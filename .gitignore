@@ -1,0 +1,47 @@
+# --- Datos: nunca se versionan (licencia de uso del TEC DataHub) ---
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+DatosPropuestos/
+*.xlsx
+*.csv.gz
+*.parquet
+
+# --- Modelos entrenados ---
+models/*
+!models/.gitkeep
+
+# --- Material del curso y de terceros (se cita, no se redistribuye) ---
+Indicaciones/
+PapersProyecto/
+ML2 - Microcurriculo.pdf
+Primera_entrega/*.pdf
+
+# --- Entornos y herramientas ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+catboost_info/
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Artefactos de LaTeX ---
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# --- Registros de ejecución ---
+logs/

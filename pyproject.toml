@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "desercion"
+version = "0.2.0"
+description = "Predicción de deserción estudiantil (Tec de Monterrey) reproduciendo y adaptando Villar & Andrade (2024)."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Miguel Camargo" },
+  { name = "Camilo Hernández" },
+]
+license = { text = "MIT" }
+dependencies = [
+  "pandas>=2.2",
+  "numpy>=1.26",
+  "scikit-learn>=1.6",
+  "imbalanced-learn>=0.13",
+  "xgboost>=2.1",
+  "lightgbm>=4.5",
+  "catboost>=1.2.7",
+  "shap>=0.46",
+  "scipy>=1.13",
+  "statsmodels>=0.14",
+  "matplotlib>=3.9",
+  "seaborn>=0.13",
+  "openpyxl>=3.1",
+  "pyarrow>=17",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "nbformat", "nbconvert", "ipykernel"]
+
+[project.scripts]
+desercion = "desercion.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

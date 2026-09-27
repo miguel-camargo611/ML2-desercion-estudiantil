@@ -1,0 +1,251 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue!50!black]{hyperref}
+\newcommand{\dt}{.\allowbreak}
+\newcommand{\us}{\_\allowbreak}
+\newcommand{\sl}{/\allowbreak}
+
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\captionsetup{font=small,labelfont=bf}
+\renewcommand{\tablename}{Tabla}
+\renewcommand{\arraystretch}{0.92}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.8em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Machine Learning II --- Proyecto Integrador}
+\fancyhead[R]{\small Primera Entrega}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- Datos del proyecto (EDITAR) ----------
+\newcommand{\tituloProyecto}{Predicción de deserción estudiantil en el Tecnológico de Monterrey mediante modelado avanzado de Machine Learning}
+\newcommand{\nombreCurso}{Machine Learning II}
+\newcommand{\nombreProfesor}{Wilmer Pineda}
+
+\begin{document}
+
+% ================= PORTADA =================
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\Large\bfseries Universidad Externado de Colombia\par}
+\vspace{0.2cm}
+{\large Departamento de Matemáticas\par}
+\vspace{0.15cm}
+{\large \nombreCurso\par}
+\vspace{2.2cm}
+
+{\large\scshape Proyecto Integrador --- Primera Entrega\par}
+\vspace{0.4cm}
+\rule{0.6\linewidth}{0.4pt}
+\vspace{0.6cm}
+
+{\Huge\bfseries \tituloProyecto \par}
+\vspace{0.6cm}
+\rule{0.6\linewidth}{0.4pt}
+
+\vfill
+
+\begin{minipage}{0.75\linewidth}
+\centering
+\textbf{Integrantes}\\[0.3cm]
+Miguel Camargo \\
+Camilo Hernández
+\end{minipage}
+
+\vspace{1.2cm}
+\textbf{Profesor:} \nombreProfesor
+
+\vspace{1.5cm}
+{\large 21 de agosto de 2026 \par}
+\vfill
+\end{titlepage}
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ================= SECCIÓN 1 =================
+\section{Comprensión y sustentación del artículo}
+
+El artículo base es Villar y Andrade (2024), \textit{Supervised machine learning algorithms for predicting student dropout and academic success: a comparative study}, publicado en \textit{Discover Artificial Intelligence}. Su problema es clásico en analítica educativa --- construir un sistema de alerta temprana que anticipe si un estudiante universitario se graduará a tiempo, desertará o continuará con rezago académico --- pero su aporte central es metodológico: demuestra, con evidencia estadística, en qué condiciones los ensambles de \emph{boosting} superan a los métodos clásicos cuando el problema está severamente desbalanceado y sus predictores están fuertemente correlacionados entre sí.
+
+El estudio extiende el trabajo de Martins et al. (2021), realizado en el Instituto Politécnico de Portalegre (IPP, Portugal), quienes solo usaron información disponible al momento de la matrícula (datos sociodemográficos estáticos) y compararon cuatro algoritmos (Árbol de Decisión, SVM, Regresión Logística y Random Forest). Villar y Andrade incorporan además el desempeño académico del primer y segundo semestre, y amplían la comparación a siete algoritmos: mantienen Árbol de Decisión, Random Forest y SVM del estudio original --- descartando la Regresión Logística por la multicolinealidad detectada (ver más abajo) --- y suman Gradient Boosting, XGBoost, CatBoost y LightGBM. Optimizan además los hiperparámetros con \textit{Optuna} en lugar de \textit{grid search} manual, suman \textit{Isolation Forest} como detector no supervisado de anomalías, y aplican SHAP para interpretar el modelo ganador.
+
+\textbf{Dataset y desbalance.} El corpus original tiene 4.424 estudiantes, 35 variables (demográficas, socioeconómicas y de trayectoria académica) y ningún valor faltante. La variable objetivo tiene tres niveles con una distribución moderadamente desbalanceada (Tabla~\ref{tab:distribucion}), lo que motiva un tratamiento explícito del desbalance antes de modelar.
+
+\begin{table}[h!]
+\centering
+\caption{Distribución de la variable objetivo en el dataset del artículo}
+\label{tab:distribucion}
+\begin{tabular}{lrr}
+\toprule
+Clase & Estudiantes & Proporción \\
+\midrule
+Graduate (graduación a tiempo) & 2.209 & 49{,}89\% \\
+Dropout (deserción / rezago crítico) & 1.421 & 32{,}15\% \\
+Enrolled (persistencia con rezago) & 794 & 17{,}96\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Multicolinealidad.} El análisis del Factor de Inflación de la Varianza (VIF) reveló valores superiores a $10^{6}$ en variables como las unidades curriculares aprobadas por semestre, lo que indica una matriz de diseño casi singular. Esto lleva a los autores a \textbf{descartar la regresión logística} --- sus coeficientes serían numéricamente inestables --- y a preferir árboles y ensambles, que no asumen independencia entre predictores.
+
+\textbf{Desbalance y anomalías.} Comparando SMOTE contra ADASYN con un árbol de decisión como control, SMOTE superó a ADASYN en las tres clases (Tabla~\ref{tab:smote}) y se adoptó para el resto del estudio. Por separado, se evaluó \textit{Isolation Forest} para verificar si los estudiantes en riesgo se comportaban como anomalías estadísticas: en la etapa con tasa de contaminación de 0{,}5, el algoritmo sí detectó al 26{,}9\% de los desertores y al 11{,}7\% de los rezagados, pero clasificó erróneamente como anomalía al 13{,}66\% de los graduados. Los propios autores concluyen que el método \emph{``did not perform well in predicting student dropout''} --- una limitación honesta que vale la pena replicar como advertencia metodológica.
+
+\begin{table}[h!]
+\centering
+\caption{F1-score por técnica de balanceo (control: Árbol de Decisión)}
+\label{tab:smote}
+\begin{tabular}{lrr}
+\toprule
+Clase & SMOTE & ADASYN \\
+\midrule
+Graduate & 0{,}75 & 0{,}74 \\
+Dropout & 0{,}78 & 0{,}73 \\
+Enrolled & 0{,}69 & 0{,}64 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Modelamiento, validación e interpretabilidad.} Tras optimizar los siete algoritmos con Optuna (20 ensayos, métrica \texttt{f1\_weighted}), CatBoost y LightGBM resultan ganadores, con F1 de hasta 0{,}88 en la clase Dropout y un AUC macro-promedio de 0{,}95 en las comparaciones uno-contra-uno --- desempeño calificado como ``sobresaliente''. Para decidir si la diferencia entre ambos modelos era real, los autores usaron la plataforma STAC, que recomendó una prueba t pareada; el resultado ($p=0{,}003$, $\alpha=0{,}05$) se interpreta en el artículo como evidencia de que \emph{no hay} diferencia significativa, una lectura que --- dado que $p<\alpha$ --- convencionalmente indicaría lo contrario. Señalamos esta inconsistencia como parte de nuestra lectura crítica del artículo, no como un error nuestro de comprensión. Finalmente, SHAP identifica de forma consistente en ambos modelos que la variable con mayor peso es el número de materias aprobadas en el segundo semestre, muy por encima de cualquier variable socioeconómica --- el hallazgo con más implicaciones prácticas del artículo, porque sugiere que el riesgo se puede estimar con buena precisión ya en el primer semestre de estudios.
+
+\textbf{Limitación reconocida por los autores.} El estudio depende de un único dataset y una sola institución (IPP, Portugal), lo que restringe la generalización de sus conclusiones a otros contextos educativos. Esta limitación es, precisamente, la que motiva nuestro proyecto: poner a prueba si boosting, SMOTE y el peso del desempeño temprano se sostienen sobre datos de una institución latinoamericana.
+
+% ================= SECCIÓN 2 =================
+\section{Planteamiento del problema}
+
+\textbf{Pregunta de investigación.} ¿En qué medida las variables socioeconómicas de un estudiante --- nivel socioeconómico, becas, apoyo financiero, entorno familiar --- permiten predecir su riesgo de deserción universitaria, y cuánto de esa capacidad predictiva se explica por el contexto socioeconómico frente al desempeño académico temprano del propio estudiante?
+
+\textbf{Tarea y variable objetivo.} Se trata de un problema de \textbf{clasificación multiclase} con tres niveles de riesgo, análogos a los del artículo: \textit{riesgo bajo} (graduación en el tiempo previsto), \textit{riesgo medio} (persistencia con rezago académico) y \textit{riesgo alto} (deserción). En el dataset propuesto (Sección 3) esta variable se reconstruye a partir del campo \texttt{retention} (binario: continúa/deserta) combinado con \texttt{dropout.semester}, que indica en qué semestre ocurrió el abandono --- lo que permite distinguir deserción temprana de rezago prolongado, en paralelo a la categoría \textit{Enrolled} del artículo.
+
+\textbf{Relevancia regional.} La deserción en educación superior es un problema estructural de toda la región, no de un país en particular. Según estimaciones de la UNESCO, entre el 30\% y el 50\% de los estudiantes universitarios en América Latina no culmina sus estudios, y cerca de la mitad de los jóvenes de 25 a 29 años en la región no ha completado su educación superior --- una magnitud consistente con la cifra cercana al 50\% que cita la propia literatura del dataset mexicano propuesto. Esta escala regional justifica un sistema de alerta temprana pensado para replicarse entre países, y no atado a las particularidades de una sola institución.
+
+\textbf{Qué se reproduce y adapta.} Reproducimos el núcleo metodológico del artículo --- balanceo con SMOTE dentro de un flujo sin fuga de datos, comparación de árboles/ensambles clásicos contra la familia de \textit{boosting}, optimización de hiperparámetros y explicabilidad con SHAP --- y lo adaptamos priorizando CatBoost por su manejo nativo de variables categóricas, particularmente relevante para predictores típicamente categóricos y dispersos en datos educativos latinoamericanos (tipo de colegio de origen, becas, región). El plan de modelamiento (Sección 4) se contrastó además con el microcurrículo oficial de Machine Learning II para asegurar que cada técnica propuesta corresponda a contenido efectivamente cubierto en el curso.
+
+% ================= SECCIÓN 3 =================
+\section{Estrategia de datos}
+
+\textbf{Vía elegida.} El equipo trabaja con dos planes: un \textbf{dataset real latinoamericano} como Plan A, y un \textbf{dataset real europeo} como Plan B, este último autorizado como excepción explícita por el profesor de la asignatura ante la eventualidad de no conseguir acceso a México ni a ninguna otra fuente colombiana o latinoamericana que cumpla el mínimo de 5.000 registros. La Tabla~\ref{tab:fuentes} las compara.
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\caption{Comparación del Plan A y el Plan B}
+\label{tab:fuentes}
+\begin{tabular}{p{1.9cm}p{4.7cm}p{4.9cm}}
+\toprule
+ & \textbf{Plan A --- México} & \textbf{Plan B --- España (excepción)} \\
+\midrule
+Fuente & Tec de Monterrey, \textit{Student Dropout Dataset} (Alvarado-Uribe et al., 2022), TEC DataHub, DOI \texttt{10\dt 57687\sl FK2\sl PWJRSJ} & Universidad tecnológica española (STEAM), \textit{StudentDropoutDataset}, Zenodo, DOI \texttt{10\dt 5281\sl zenodo\dt 17239943} \\
+Unidad & Un registro = un estudiante & Un registro = matrícula estudiante--asignatura--año (agregable por estudiante) \\
+Tamaño & 143.326 registros / 121.584 estudiantes, 7 cohortes (2014--2020), 50 variables & 464.739 registros / 39.364 estudiantes (2018, 2021, 2022), 77 variables \\
+Acceso & Diccionario/muestra inmediatos; dataset completo con formulario (enviado, en trámite) & CSV directo, sin trámite --- ya en poder del equipo \\
+Objetivo & \texttt{retention} & \texttt{abandono\us hash} \\
+Ventaja & Estructura casi idéntica al artículo; caso latinoamericano real & Cero fricción; mayor volumen; variables LMS/Wi-Fi únicas \\
+Limitación & Depende del trámite institucional & Español, no latinoamericano; uso condicionado a la excepción del profesor \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Por qué España es una excepción autorizada.} El proyecto está pensado para trabajarse con un caso colombiano o latinoamericano real, y un dataset español no encaja en ese criterio geográfico. Antes de considerar esta vía, el equipo agotó la búsqueda de alternativas: se revisaron fuentes oficiales y académicas en Colombia, México, Chile, Brasil, Perú, Argentina y Ecuador, así como repositorios generales (Kaggle, Zenodo, Mendeley Data) y organismos internacionales (Banco Mundial, CEPAL, BID). Ninguna combinó los cuatro requisitos a la vez --- real, individual (un registro por estudiante), de educación superior y con al menos 5.000 registros --- salvo el Plan A (México). Con esa evidencia, el equipo consultó al profesor Wilmer Pineda, quien autorizó el uso del dataset español tal cual (sin recalibración) como Plan B, exclusivamente para el escenario en que no se obtenga acceso a México ni se identifique una fuente colombiana o latinoamericana que cumpla el mínimo de 5.000 registros a nivel de estudiante.
+
+\textbf{Criterio de decisión.} El equipo da prioridad al \textbf{Plan A (México)} por ser un caso latinoamericano real sin necesidad de ninguna adaptación geográfica. Ya se envió la solicitud formal --- formulario de solicitud de datos y diccionario de variables marcado --- al equipo de IFE Data Hub del Tecnológico de Monterrey; a la fecha de este informe, dicho equipo respondió solicitando documentación adicional, lo que indica que el trámite avanza favorablemente y se espera resolverlo antes de la Segunda Entrega. El \textbf{Plan B (España)} queda completamente preparado --- dataset descargado y verificado, variables mapeadas (Tabla~\ref{tab:mapeo}) --- para activarse, tal cual, solo si el trámite mexicano no se resuelve a tiempo.
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\caption{Correspondencia de variables: artículo vs.\ Plan A (México) y Plan B (España).}
+\label{tab:mapeo}
+\begin{tabular}{p{2.6cm}p{3.7cm}p{3.9cm}p{3.9cm}}
+\toprule
+Categoría & Artículo (Portugal) & México & España \\
+\midrule
+Demográficas & Civil, nacionalidad, género, edad & \texttt{gender}, \texttt{age}, \texttt{foreign}, \texttt{zone\dt type} & \texttt{desplazado\us hash} \\
+Socioeconómicas & Educación/ocupación de los padres & \texttt{max\dt degree\dt parents}, \texttt{socioeconomic\dt level} & \texttt{estudios\us p\us hash}, \texttt{estudios\us m\us hash} \\
+Financieras & Becario, deudor, matrícula al día & \texttt{scholarship\dt perc}, \texttt{scholarship\dt type} & \texttt{impagado\us curso\us mat} \\
+Trayectoria & Nota de admisión, curso, jornada & \texttt{program}, \texttt{admission\dt test}, \texttt{admission\dt rubric} & \texttt{tit\us hash}, \texttt{campus\us hash}, \texttt{nota10\us hash}, \texttt{dedicacion} \\
+Desempeño & Unidades curriculares por semestre & \texttt{average\dt first\dt period}, \texttt{failed\dt subject\dt first\dt period} & \texttt{cred\us sup\us total}, \texttt{rendimiento\us total} \\
+Digital (extra) & --- & --- & \texttt{pft\us events}, \texttt{n\us wifi\us days} \\
+Objetivo & Graduate/Dropout/Enrolled & \texttt{retention} & \texttt{abandono\us hash} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Calidad inicial de los datos.} En la muestra real ya inspeccionada del Plan A (México), los valores faltantes están codificados explícitamente como ``No information'' o ``Does not apply'' en las variables categóricas --- no hay celdas vacías sin explicar ---, lo que facilita distinguir un dato ausente de uno estructuralmente no aplicable (por ejemplo, variables de vida estudiantil que solo se preguntaron a ciertas cohortes). El Plan B (España) no tiene diccionario público, por lo que su calidad se evaluará directamente sobre el archivo ya descargado si llegara a activarse. Ninguna de las dos fuentes requiere imputación de la variable objetivo.
+
+\textbf{Protocolo contra la fuga de información.} Todo el preprocesamiento (imputación, codificación, escalamiento y balanceo con SMOTE) se integrará en un \texttt{Pipeline} de scikit-learn, de modo que el sobremuestreo se ajuste \emph{exclusivamente} con los datos de entrenamiento de cada partición de la validación cruzada, replicando el cuidado metodológico del artículo --- independientemente de cuál de las dos fuentes se confirme.
+
+% ================= SECCIÓN 4 =================
+\section{Plan de modelamiento y línea base}
+
+\textbf{Modelos candidatos.} Para esta primera entrega se replica el espectro de árboles y ensambles del artículo (Tabla~\ref{tab:modelos}).
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\caption{Modelos candidatos y su rol en el estudio}
+\label{tab:modelos}
+\begin{tabular}{llp{6cm}}
+\toprule
+Modelo & Familia & Rol \\
+\midrule
+Clasificador de mayoría & Trivial & Piso mínimo de comparación \\
+Árbol de Decisión (sin poda) & Árboles & Línea base de referencia (nivel ML1) \\
+Random Forest & Ensamble (\textit{bagging}) & Ensamble paralelo de referencia \\
+SVM & Máquinas de soporte vectorial & Comparador tradicional del artículo (semana 7) \\
+Gradient Boosting & Boosting & Boosting secuencial clásico \\
+XGBoost & Boosting & Boosting regularizado, alto rendimiento \\
+CatBoost & Boosting & Manejo nativo de categóricas (prioritario) \\
+LightGBM & Boosting & Eficiencia en datasets grandes (\textit{leaf-wise}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Alineación con el microcurrículo.} Este plan se contrastó con la programación oficial de Machine Learning II (semestre 2026-2): bagging (semana 3), Random Forest (semanas 3--4), Gradient Boosting (semana 4), XGBoost/LightGBM/CatBoost (semana 5) y SVM (semana 7). Los modelos de árboles y ensambles de la Tabla~\ref{tab:modelos} corresponden a contenido ya cubierto, por lo que el equipo puede iniciar su implementación de inmediato; SVM se incorporará cuando el curso llegue a esa semana, antes de la Segunda Entrega. Los modelos de densidad y clustering (semanas 8--9) e interpretabilidad avanzada con SHAP (semana 12) quedan para entregas posteriores.
+
+\textbf{Otras técnicas del artículo.} El artículo emplea además tres herramientas que no corresponden a una sesión propia del curso, y el equipo decidió cómo tratarlas: \textit{Isolation Forest} sí se replicará --- pertenece a la misma familia de árboles y ensambles vista en la semana 3, y reproducir su resultado (el artículo reporta que no detecta bien la deserción) es una comprobación de bajo costo con alto valor crítico. Para la optimización de hiperparámetros, en lugar de \textit{Optuna} (búsqueda bayesiana) se usará \texttt{GridSearchCV}: según el microcurrículo del curso, esta es la herramienta que se verá más adelante para el mismo propósito (semana 14). Esta sustitución se documenta como una adaptación deliberada, no como una limitación. Finalmente, la comparación estadística entre los dos mejores modelos se hará con una prueba t pareada (o su alternativa no paramétrica si no se cumple normalidad) usando \texttt{scipy.stats}, apoyándose en los fundamentos de Inferencia Estadística sin requerir la plataforma STAC del artículo.
+
+\textbf{Métrica principal.} El artículo usa el F1-score ponderado como métrica principal. Nosotros, en cambio, proponemos priorizar el \textbf{recall} de la clase 'deserción' como métrica principal, porque en este caso no todos los errores tienen el mismo costo. Un falso negativo, es decir, que un estudiante que va a desertar no sea identificado, significa que la institución pierde la oportunidad de intervenir y ayudarlo a continuar sus estudios. En cambio, un falso positivo significa que se atiende o contacta a un estudiante que realmente no estaba en riesgo, lo cual tiene un costo menor. Dado que optimizar solo el recall podría llevar a un modelo que marque a casi todos los estudiantes como riesgo alto, se reportarán también el F1 ponderado y la precisión como métricas secundarias de control. El ajuste fino del umbral de decisión se calibrará con datos reales para la Segunda Entrega.
+
+\textbf{Validación.} Se usará \textit{Stratified K-Fold}, manteniendo la proporción de clases en cada partición. Dado el tamaño del dataset propuesto (más de 120.000 estudiantes, frente a los 4.424 del artículo), se fijará $k=5$ en lugar del $k=10$ típico en estudios de menor escala, para mantener el costo computacional razonable sin sacrificar la representatividad de cada partición --- una adaptación explícita del protocolo original al volumen de datos disponible.
+
+\textbf{Línea base.} Se reporta primero un \textbf{clasificador de mayoría}, como piso mínimo de comparación, y luego un \textbf{Árbol de Decisión sin poda} --- el mismo modelo de referencia usado en el artículo ---, que ilustra el problema de alta varianza que los ensambles avanzados de este curso están diseñados para corregir. Todo modelo posterior deberá superar ambas líneas base para justificar su mayor complejidad.
+
+% ================= BIBLIOGRAFÍA =================
+\begin{thebibliography}{9}
+
+\bibitem{villar2024}
+Villar, A. \& Robledo Velini de Andrade, C. (2024). Supervised machine learning algorithms for predicting student dropout and academic success: a comparative study. \textit{Discover Artificial Intelligence}, 4:2. \url{https://doi.org/10.1007/s44163-023-00079-z}
+
+\bibitem{martins2021}
+Martins, M. V., Tolledo, D., Machado, J., Baptista, L. M., \& Realinho, V. (2021). Early prediction of student's performance in higher education: a case study. En Á. Rocha, H. Adeli, G. Dzemyda, F. Moreira, \& A. M. R. Correia (Eds.), \textit{Trends and Applications in Information Systems and Technologies}, vol. 9 (pp. 166--175). Springer International Publishing.
+
+\bibitem{alvarado2022}
+Alvarado-Uribe, J., Mejía-Almada, P., Masetto Herrera, A. L., Molontay, R., Hilliger, I., Hegde, V., Montemayor Gallegos, J. E., Ramírez Díaz, R. A., \& Ceballos, H. G. (2022). Student Dataset from Tecnologico de Monterrey in Mexico to Predict Dropout in Higher Education. \textit{Data}, 7(9), 119. \url{https://doi.org/10.3390/data7090119}
+
+\bibitem{iesalc}
+UNESCO-IESALC --- Instituto Internacional de la UNESCO para la Educación Superior en América Latina y el Caribe. Estadísticas y estudios regionales sobre acceso, permanencia y abandono en la educación superior. \url{https://www.iesalc.unesco.org/}
+
+\bibitem{spain2025}
+StudentDropoutDataset (2025). Datos longitudinales de matrícula, desempeño académico y factores socioeconómicos de una universidad tecnológica española. Zenodo. \url{https://doi.org/10.5281/zenodo.17239943}
+
+\end{thebibliography}
+
+\end{document}
