@@ -13,6 +13,8 @@ import pandas as pd  # noqa: E402
 import shap  # noqa: E402
 from sklearn.metrics import precision_recall_curve  # noqa: E402
 
+from desercion.features import VAR_LABELS  # noqa: E402
+
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 GRAY, INK, INK2, GRID = "#9a9994", "#0b0b0b", "#52514e", "#e6e5e0"
 SERIES = [BLUE, ORANGE, AQUA]
@@ -40,33 +42,20 @@ def _save(fig, path: Path) -> Path:
 
 # --------------------------------------------------------------------- datos
 def target_by_cohort(df: pd.DataFrame, path: Path) -> Path:
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.6), gridspec_kw={"width_ratios": [1.4, 1]})
+    """Tasa de deserción en el primer año por cohorte de ingreso."""
+    fig, ax = plt.subplots(figsize=(5.2, 2.5))
     rate = df.groupby("generation")["desercion"].mean() * 100
-    ax = axes[0]
     ax.bar(rate.index, rate.values, color=BLUE, width=0.6)
     for x, v in zip(rate.index, rate.values, strict=True):
         ax.text(x, v + 0.15, _num(v, 1), ha="center", va="bottom", fontsize=8, color=INK2)
     mean = df["desercion"].mean() * 100
     ax.axhline(mean, color=GRAY, ls="--", lw=1)
     ax.set_ylim(0, 12.2)
-    ax.text(len(rate) - 0.6, 11.6, f"– – promedio {_num(mean, 1)}", ha="right", fontsize=7, color=INK2)
+    ax.text(len(rate) - 0.6, 11.6, f"– – promedio {_num(mean, 1)} %", ha="right", fontsize=7,
+            color=INK2)
     ax.set_ylabel("Deserción en el primer año (%)")
-    ax.set_title("(a) Tasa de deserción por cohorte")
+    ax.set_xlabel("Cohorte de ingreso")
     ax.grid(axis="x", visible=False)
-
-    ax = axes[1]
-    labels = {1: "Durante 1er sem.", 2: "No se inscribe 2º", 3: "Durante 2º sem.",
-              4: "No se inscribe 3º"}
-    counts = df.loc[df["dropout.semester"] > 0, "dropout.semester"].value_counts().sort_index()
-    ax.barh([labels[i] for i in counts.index], counts.values, color=[BLUE, BLUE, ORANGE, ORANGE],
-            height=0.6)
-    for i, v in enumerate(counts.values):
-        ax.text(v + 60, i, f"{v:,}".replace(",", "."), va="center", fontsize=8, color=INK2)
-    ax.invert_yaxis()
-    ax.set_xlabel("Desertores")
-    ax.set_title("(b) Momento de la deserción")
-    ax.grid(axis="y", visible=False)
-    ax.set_xlim(0, counts.max() * 1.25)
     fig.tight_layout()
     return _save(fig, path)
 
@@ -199,12 +188,13 @@ def validation_curve(curves: dict[str, pd.DataFrame], path: Path) -> Path:
 
 # -------------------------------------------------------------- interpretación
 def shap_importance(tables: dict[str, pd.DataFrame], path: Path, titles: dict[str, str] | None = None,
-                    top: int = 12) -> Path:
-    fig, axes = plt.subplots(1, len(tables), figsize=(7.2, 3.3))
+                    top: int = 10) -> Path:
+    fig, axes = plt.subplots(1, len(tables), figsize=(7.6, 3.2))
     axes = np.atleast_1d(axes)
     for ax, (s, t) in zip(axes, tables.items(), strict=True):
         t = t.head(top).iloc[::-1]
-        ax.barh(t.index, t["media"], xerr=t["sd"], color=BLUE, height=0.65,
+        labels = [VAR_LABELS.get(v, v) for v in t.index]
+        ax.barh(labels, t["media"], xerr=t["sd"], color=BLUE, height=0.65,
                 error_kw={"ecolor": INK2, "lw": 1, "capsize": 2})
         ax.set_xlabel("|SHAP| medio (log-odds)")
         ax.set_title((titles or {}).get(s, f"Escenario {s}"))

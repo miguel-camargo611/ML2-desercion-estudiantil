@@ -1,0 +1,14 @@
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{7.3cm}cc}
+\toprule
+Modelo & Valores explorados & Elegido A & Elegido B \\
+\midrule
+Regresión logística & $C$: 0{,}0003, 0{,}001, 0{,}003, 0{,}01, 0{,}03 & 0{,}01 & 0{,}001 \\
+Random Forest & profundidad máx.: sin límite; mín. registros por hoja: 10, 30, 100 & sin límite, 30 & sin límite, 10 \\
+SVM (kernel RBF) & $\gamma$: 0{,}001, 0{,}005; $C$: 0{,}01, 0{,}1 & 0{,}001, 0{,}1 & 0{,}005, 0{,}01 \\
+Gradient Boosting & tasa de aprendizaje: 0{,}05, 0{,}1; máx. hojas: 15, 31 & 0{,}05, 15 & 0{,}05, 15 \\
+XGBoost & profundidad máx.: 4, 6; tasa de aprendizaje: 0{,}05, 0{,}1 & 4, 0{,}1 & 4, 0{,}05 \\
+LightGBM & hojas: 4, 8, 15, 31; tasa de aprendizaje: 0{,}02, 0{,}05 & 15, 0{,}05 & 8, 0{,}05 \\
+CatBoost & profundidad: 4, 6; tasa de aprendizaje: 0{,}05, 0{,}1 & 6, 0{,}05 & 4, 0{,}1 \\
+CatBoost nativo$^{\dagger}$ & profundidad: 4, 6; tasa de aprendizaje: 0{,}05, 0{,}1 & 4, 0{,}1 & 4, 0{,}05 \\
+\bottomrule
+\end{tabular}

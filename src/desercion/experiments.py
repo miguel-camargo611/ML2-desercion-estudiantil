@@ -117,12 +117,14 @@ def leakage_demo(dev: pd.DataFrame, scenario: str, multiclass: bool = False) -> 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     rows = []
 
-    def _record(protocol, k, yv, pred):
+    def _record(protocol, k, yv, pred, proba):
         f1s = f1_score(yv, pred, labels=labels, average=None)
         row = {"protocolo": protocol, "pliegue": k,
                "f1_ponderado": f1_score(yv, pred, average="weighted"),
                "f1_macro": f1_score(yv, pred, average="macro")}
         row.update({f"f1_{n}": v for n, v in zip(names, f1s, strict=True)})
+        if not multiclass:  # métrica independiente del umbral
+            row["pr_auc"] = average_precision_score(yv, proba[:, 1])
         rows.append(row)
 
     # Protocolo del artículo
@@ -130,13 +132,15 @@ def leakage_demo(dev: pd.DataFrame, scenario: str, multiclass: bool = False) -> 
     Xr, yr = SMOTE(random_state=seed).fit_resample(Xt, y)
     for k, (tr, va) in enumerate(cv.split(Xr, yr)):
         m = clone(clf).fit(Xr[tr], yr[tr])
-        _record("Artículo (SMOTE antes de partir)", k, yr[va], m.predict(Xr[va]))
+        _record("Artículo (SMOTE antes de partir)", k, yr[va], m.predict(Xr[va]),
+                m.predict_proba(Xr[va]))
 
     # Pipeline correcto
     spec = ModelSpec("LightGBM", "", clf)
     for k, (tr, va) in enumerate(cv.split(X, y)):
         pipe = build_pipeline(spec, num, cat).fit(X.iloc[tr], y[tr])
-        _record("Pipeline (SMOTE dentro del pliegue)", k, y[va], pipe.predict(X.iloc[va]))
+        _record("Pipeline (SMOTE dentro del pliegue)", k, y[va], pipe.predict(X.iloc[va]),
+                pipe.predict_proba(X.iloc[va]))
     return pd.DataFrame(rows)
 
 

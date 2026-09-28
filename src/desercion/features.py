@@ -113,3 +113,39 @@ def make_native_preprocessor(num: list[str], cat: list[str]) -> ColumnTransforme
         verbose_feature_names_out=False,
     )
     return ct.set_output(transform="pandas")
+
+
+# Nombre legible de cada variable para figuras y tablas del informe.
+VAR_LABELS = {
+    "age": "Edad",
+    "gender": "Género",
+    "foreign": "Procedencia",
+    "scholarship.perc": "% de beca",
+    "loan.perc": "% de crédito",
+    "total.scholarship.loan": "% total de apoyo (beca + crédito)",
+    "max.degree.parents": "Máximo grado de los padres",
+    "father.education.summary": "Educación del padre",
+    "mother.education.summary": "Educación de la madre",
+    "parents.exatec": "Padres exalumnos del Tec",
+    "first.generation": "Primera generación universitaria",
+    "zone.type": "Tipo de zona de residencia",
+    "socioeconomic.level": "Nivel socioeconómico",
+    "social.lag": "Rezago social",
+    "school.cost": "Costo del colegio de origen",
+    "scholarship.type": "Tipo de beca",
+    "PNA": "Promedio de bachillerato",
+    "admission.test": "Examen de admisión",
+    "admission.rubric": "Rúbrica de admisión",
+    "general.math.eval": "Nota de matemáticas (admisión)",
+    "english.evaluation": "Nivel de inglés",
+    "online.test": "Examen en línea",
+    "tec.no.tec": "Colegio del Tec",
+    "FTE": "Carga académica",
+    "educational.model": "Modelo educativo",
+    "school": "Escuela",
+    "program": "Programa",
+    "region": "Región del campus",
+    "average.first.period": "Promedio del 1.er semestre",
+    "failed.subject.first.period": "Materias reprobadas (1.er sem.)",
+    "dropped.subject.first.period": "Materias retiradas (1.er sem.)",
+}

@@ -223,16 +223,25 @@ def cmd_figures(args) -> None:
             plots.shap_beeswarm(pd.read_pickle(last), f / "fig08_shap_beeswarm_B.png")
 
 
+# Figuras que usa el informe de la Segunda entrega (el resto queda en reports/figures).
+REPORT_FIGURES = ["fig01_desercion_cohorte.png", "fig06_ablacion.png", "fig07_shap_importancia.png"]
+
+
 def cmd_report(args) -> None:
     dst = config.path("report_figures_dir")
-    for fig in _figures().glob("*.png"):
-        shutil.copy2(fig, dst / fig.name)
-    summaries = {s: pd.read_csv(_tables() / f"cv_resumen_{s}.csv", index_col=0) for s in ("A", "B")
-                 if (_tables() / f"cv_resumen_{s}.csv").exists()}
-    if summaries:
-        tex = report.results_table(summaries, _tables() / "tabla_resultados.tex")
-        shutil.copy2(tex, dst.parent / "tabla_resultados.tex")
-    log.info("Figuras y tablas copiadas a %s", dst.parent)
+    for old in dst.glob("*.png"):
+        old.unlink()
+    for name in REPORT_FIGURES:
+        shutil.copy2(_figures() / name, dst / name)
+    t, out = _tables(), dst.parent
+    summaries = {s: pd.read_csv(t / f"cv_resumen_{s}.csv", index_col=0) for s in ("A", "B")}
+    folds = {s: pd.read_csv(t / f"cv_pliegues_{s}.csv") for s in ("A", "B")}
+    grids = {name: spec.grid for name, spec in get_specs().items()}
+    for tex in (report.results_table(summaries, t / "tabla_resultados.tex"),
+                report.hyperparams_table(folds, grids, t / "tabla_hiperparametros.tex"),
+                report.leakage_table(pd.read_csv(t / "fuga_smote_A.csv"), t / "tabla_fuga.tex")):
+        shutil.copy2(tex, out / tex.name)
+    log.info("Figuras y tablas del informe copiadas a %s", out)
 
 
 def cmd_all(args) -> None:
