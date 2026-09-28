@@ -1,0 +1,20 @@
+variable,motivo
+retention,Es el objetivo (se recodifica como desercion = 1 - retention).
+dropout.semester,Derivada del objetivo: solo es > 0 si el estudiante desertó (fuga directa).
+student.id,Identificador; se usa solo para agrupar la partición.
+generation,Identifica la cohorte; una cohorte nueva no existiría en entrenamiento.
+level,Constante tras filtrar pregrado.
+id.school.origin,6.534 niveles; su información se resume en school.cost y tec.no.tec.
+father.education.complete,Redundante con father.education.summary.
+mother.education.complete,Redundante con mother.education.summary.
+father.exatec,Redundante con parents.exatec.
+mother.exatec,Redundante con parents.exatec.
+physical.education,Actividad co-curricular del periodo: ambigüedad temporal y 'No information' concentra desertores (marcador de fuga).
+cultural.diffusion,Ídem actividades co-curriculares.
+student.society,Ídem actividades co-curriculares.
+total.life.activities,Ídem actividades co-curriculares.
+athletic.sports,Ídem actividades co-curriculares.
+art.culture,Ídem actividades co-curriculares.
+student.society.leadership,Ídem actividades co-curriculares.
+life.work.mentoring,Ídem actividades co-curriculares.
+wellness.activities,Ídem actividades co-curriculares.

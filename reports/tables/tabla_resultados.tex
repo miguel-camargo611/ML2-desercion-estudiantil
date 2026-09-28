@@ -1,0 +1,20 @@
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+ & \multicolumn{4}{c}{Escenario A} & \multicolumn{4}{c}{Escenario B} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+Modelo & PR-AUC & ROC-AUC & F2 & Recall & PR-AUC & ROC-AUC & F2 & Recall \\
+\midrule
+Mayoría & 0{,}088\,\scriptsize$\pm$0{,}000 & 0{,}500 & 0{,}325\,\scriptsize$\pm$0{,}000 & 1{,}000 & 0{,}078\,\scriptsize$\pm$0{,}000 & 0{,}500 & 0{,}296\,\scriptsize$\pm$0{,}000 & 1{,}000 \\
+Árbol sin poda & 0{,}095\,\scriptsize$\pm$0{,}003 & 0{,}530 & 0{,}325\,\scriptsize$\pm$0{,}000 & 1{,}000 & 0{,}086\,\scriptsize$\pm$0{,}001 & 0{,}534 & 0{,}296\,\scriptsize$\pm$0{,}000 & 1{,}000 \\
+\midrule
+Regresión logística & 0{,}192\,\scriptsize$\pm$0{,}011 & 0{,}685 & 0{,}376\,\scriptsize$\pm$0{,}009 & 0{,}688 & 0{,}216\,\scriptsize$\pm$0{,}017 & 0{,}705 & 0{,}366\,\scriptsize$\pm$0{,}016 & 0{,}648 \\
+Random Forest & 0{,}162\,\scriptsize$\pm$0{,}004 & 0{,}667 & 0{,}367\,\scriptsize$\pm$0{,}007 & 0{,}733 & 0{,}179\,\scriptsize$\pm$0{,}006 & 0{,}684 & 0{,}347\,\scriptsize$\pm$0{,}013 & 0{,}622 \\
+SVM (RBF) & 0{,}191\,\scriptsize$\pm$0{,}012 & 0{,}684 & 0{,}378\,\scriptsize$\pm$0{,}008 & 0{,}717 & 0{,}216\,\scriptsize$\pm$0{,}021 & 0{,}704 & \textbf{0{,}368\,\scriptsize$\pm$0{,}014} & 0{,}668 \\
+Gradient Boosting & 0{,}185\,\scriptsize$\pm$0{,}010 & 0{,}677 & 0{,}373\,\scriptsize$\pm$0{,}008 & 0{,}772 & 0{,}228\,\scriptsize$\pm$0{,}029 & 0{,}699 & 0{,}353\,\scriptsize$\pm$0{,}005 & 0{,}748 \\
+XGBoost & 0{,}182\,\scriptsize$\pm$0{,}010 & 0{,}672 & 0{,}368\,\scriptsize$\pm$0{,}009 & 0{,}792 & 0{,}224\,\scriptsize$\pm$0{,}026 & 0{,}696 & 0{,}353\,\scriptsize$\pm$0{,}012 & 0{,}719 \\
+LightGBM & 0{,}187\,\scriptsize$\pm$0{,}010 & 0{,}678 & 0{,}375\,\scriptsize$\pm$0{,}009 & 0{,}764 & \textbf{0{,}233\,\scriptsize$\pm$0{,}028} & 0{,}701 & 0{,}360\,\scriptsize$\pm$0{,}010 & 0{,}730 \\
+CatBoost & 0{,}186\,\scriptsize$\pm$0{,}009 & 0{,}677 & 0{,}372\,\scriptsize$\pm$0{,}009 & 0{,}745 & 0{,}228\,\scriptsize$\pm$0{,}024 & 0{,}704 & 0{,}364\,\scriptsize$\pm$0{,}012 & 0{,}674 \\
+CatBoost nativo$^{\dagger}$ & \textbf{0{,}199\,\scriptsize$\pm$0{,}010} & \textbf{0{,}694} & \textbf{0{,}384\,\scriptsize$\pm$0{,}007} & 0{,}700 & 0{,}230\,\scriptsize$\pm$0{,}023 & \textbf{0{,}709} & 0{,}364\,\scriptsize$\pm$0{,}013 & 0{,}682 \\
+\bottomrule
+\end{tabular}
