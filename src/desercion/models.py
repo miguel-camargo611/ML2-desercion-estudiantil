@@ -59,13 +59,13 @@ def get_specs(seed: int | None = None) -> dict[str, ModelSpec]:
         ModelSpec(
             "Regresión logística", "Referencia (ML1)",
             LogisticRegression(max_iter=3000, random_state=seed),
-            grid={"clf__C": [0.01, 0.1, 1.0]}, search_n_jobs=3,
+            grid={"clf__C": [0.0003, 0.001, 0.003, 0.01, 0.03]}, search_n_jobs=5,
         ),
         ModelSpec(
             "Random Forest", "Bagging",
             RandomForestClassifier(n_estimators=300, max_features="sqrt", n_jobs=_n_jobs(),
                                    random_state=seed),
-            grid={"clf__max_depth": [12, None], "clf__min_samples_leaf": [1, 10]},
+            grid={"clf__max_depth": [None], "clf__min_samples_leaf": [10, 30, 100]},
         ),
         ModelSpec(
             "SVM (RBF-Nystroem)", "SVM y kernels",
@@ -73,7 +73,7 @@ def get_specs(seed: int | None = None) -> dict[str, ModelSpec]:
                 ("kernel", Nystroem(kernel="rbf", n_components=400, random_state=seed)),
                 ("svm", LinearSVC(dual=False, max_iter=5000, random_state=seed)),
             ]),
-            grid={"clf__kernel__gamma": [0.005, 0.02], "clf__svm__C": [0.1, 1.0]},
+            grid={"clf__kernel__gamma": [0.001, 0.005], "clf__svm__C": [0.01, 0.1]},
             search_n_jobs=4,
         ),
         ModelSpec(

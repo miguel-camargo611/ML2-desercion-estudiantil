@@ -133,6 +133,19 @@ def summarize(folds: pd.DataFrame, metrics: list[str] | None = None) -> pd.DataF
     return agg.sort_values("pr_auc_mean", ascending=False)
 
 
+def capture_at_top(oof: pd.DataFrame, fractions=(0.05, 0.10, 0.20, 0.30)) -> pd.DataFrame:
+    """Recall y precisión si se alerta solo al k % de estudiantes con mayor riesgo (por pliegue)."""
+    rows = []
+    for (model, fold), d in oof.groupby(["modelo", "pliegue"]):
+        d = d.sort_values("score", ascending=False)
+        for frac in fractions:
+            top = d.head(int(round(frac * len(d))))
+            rows.append({"modelo": model, "pliegue": fold, "fraccion_alertada": frac,
+                         "recall": top["y"].sum() / d["y"].sum(), "precision": top["y"].mean(),
+                         "lift": top["y"].mean() / d["y"].mean()})
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------- pruebas estadísticas
 def compare_models(folds: pd.DataFrame, a: str, b: str, metric: str, n_train: int,
                    n_test: int) -> dict[str, Any]:

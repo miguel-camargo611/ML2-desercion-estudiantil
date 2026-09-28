@@ -27,6 +27,25 @@ SVM con kernel RBF (aproximación de Nystroem), Gradient Boosting, XGBoost, Ligh
 (con SMOTE o con categóricas nativas), con **validación cruzada anidada** (5×3) agrupada por estudiante,
 SMOTE dentro del `Pipeline` y umbral de decisión calibrado para priorizar el *recall* (F2).
 
+## Resultados principales (Segunda entrega)
+
+| | Escenario A (ingreso) | Escenario B (1.er periodo) |
+|---|---|---|
+| Prevalencia de deserción | 8,8 % | 7,8 % |
+| Mejor modelo | CatBoost nativo — PR-AUC 0,199 ± 0,010 | LightGBM — PR-AUC 0,233 ± 0,028 |
+| Regresión logística (referencia) | 0,192 | 0,216 |
+| Árbol sin poda (línea base) | 0,095 | 0,086 |
+| Desertores capturados alertando al 20 % de mayor riesgo | 42 % | 46 % |
+
+- **La señal es débil** (ROC-AUC ≈ 0,70) y el *boosting* supera por poco a un modelo lineal bien regularizado.
+- **Fuga en el artículo:** aplicar SMOTE antes de partir, como hacen Villar & Andrade, sube el F1 de las
+  clases de deserción de 0,02 a 0,76, del orden de las cifras publicadas.
+- **SMOTE no ayuda** a ordenar por riesgo (empeora el PR-AUC en A); el mejor modelo usa pesos de clase.
+- **El desempeño del primer periodo** es el mejor predictor (3 variables superan a las 28 de ingreso),
+  como en el artículo; al ingreso, ningún grupo de variables domina.
+
+Detalle en [`Segunda_entrega/segunda_entrega.pdf`](Segunda_entrega/segunda_entrega.pdf) y en `reports/tables/`.
+
 ## Estructura
 
 ```
@@ -44,6 +63,7 @@ SMOTE dentro del `Pipeline` y umbral de decisión calibrado para priorizar el *r
 │   ├── experiments.py         # SMOTE vs ADASYN, fuga, Isolation Forest, ablación, multiclase, VIF
 │   ├── interpret.py           # SHAP por pliegue y análisis de errores
 │   ├── plots.py               # figuras del informe
+│   ├── report.py              # tablas LaTeX generadas desde los resultados
 │   └── cli.py                 # punto de entrada del flujo
 ├── tests/                     # pruebas con datos sintéticos (corren en CI)
 ├── Primera_entrega/  Segunda_entrega/   # informes (LaTeX)
@@ -61,8 +81,8 @@ python -m desercion.cli all       # o paso a paso: prepare, train, compare, expe
 pytest                            # pruebas
 ```
 
-La corrida completa tarda unas 4 horas en un portátil de 12 hilos (la CV anidada del escenario A es
-lo más costoso). Todo usa la semilla `42` de `configs/config.yaml`. El 20 % de los estudiantes queda
+La corrida completa tarda unas 3 horas en un portátil de 12 hilos (la CV anidada del escenario A es
+lo más costoso). Para una prueba rápida: `python -m desercion.cli train --scenarios B --sample 0.1`. Todo usa la semilla `42` de `configs/config.yaml`. El 20 % de los estudiantes queda
 en un **conjunto de prueba sellado** que solo se usará en la Entrega final.
 
 ## Buenas prácticas adoptadas

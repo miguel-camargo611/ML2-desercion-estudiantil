@@ -31,3 +31,7 @@ metrics:
   threshold_beta: 2           # F-beta para fijar el umbral: el recall pesa el doble
 
 onehot_min_frequency: 30      # categorías con menos registros se agrupan como "infrecuentes"
+
+# Modelo que se interpreta con SHAP en ambos escenarios (mejor en A, empatado con el mejor en B
+# y sin SMOTE, cuyas muestras sintéticas sobre columnas one-hot distorsionan la lectura).
+interpret_model: CatBoost nativo

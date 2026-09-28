@@ -53,9 +53,11 @@ def shap_by_fold(dev: pd.DataFrame, scenario: str, spec: ModelSpec, n_sample: in
         Xv = pipe.named_steps["prep"].transform(X.iloc[va_s])
         names = list(pipe.named_steps["prep"].get_feature_names_out())
         sv = _shap_matrix(shap.TreeExplainer(pipe.named_steps["clf"]), Xv)
-        imp = pd.Series(np.abs(sv).mean(axis=0), index=names)
-        agg = imp.groupby([original_variable(f, originals) for f in names]).sum()
-        rows.append(agg.rename(k))
+        # Por aditividad de SHAP, la contribución de una variable original es la suma (con signo)
+        # de las de sus columnas transformadas; luego se promedia el valor absoluto.
+        per_var = pd.DataFrame(sv, columns=names).T.groupby(
+            [original_variable(f, originals) for f in names]).sum().T
+        rows.append(per_var.abs().mean(axis=0).rename(k))
         last = {"shap": sv, "X": pd.DataFrame(np.asarray(Xv), columns=names)}
         log.info("SHAP %s pliegue %d listo", scenario, k)
     table = pd.concat(rows, axis=1)

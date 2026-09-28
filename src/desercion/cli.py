@@ -23,12 +23,13 @@ import warnings
 import pandas as pd
 from sklearn.base import clone
 
-from desercion import config, data, evaluate, experiments, interpret, plots
+from desercion import config, data, evaluate, experiments, interpret, plots, report
 from desercion.features import EXCLUDED, feature_lists
 from desercion.models import get_specs
 
 log = logging.getLogger("desercion")
-TREE_MODELS = ["LightGBM", "CatBoost", "XGBoost", "Gradient Boosting", "Random Forest"]
+TREE_MODELS = ["LightGBM", "CatBoost", "CatBoost nativo", "XGBoost", "Gradient Boosting",
+               "Random Forest"]
 
 
 def _tables():
@@ -110,7 +111,7 @@ def cmd_compare(args) -> None:
         n = len(_dev(s))
         n_test = n // k
         pairs = [(best, second), (best, "Árbol sin poda"), (best, "Regresión logística"),
-                 ("LightGBM", "CatBoost")]
+                 (best, "LightGBM"), ("LightGBM", "CatBoost"), ("LightGBM", "Regresión logística")]
         for a, b in dict.fromkeys(pairs):
             if a == b or b not in set(folds.modelo) or a not in set(folds.modelo):
                 continue
@@ -122,21 +123,34 @@ def cmd_compare(args) -> None:
     log.info("\n%s", out.round(4).to_string(index=False))
 
 
+EXPERIMENTS = ["vif", "ablacion", "isolation_forest", "curva_validacion", "balanceo_lgbm",
+               "balanceo_arbol", "fuga", "multiclase"]
+
+
 def cmd_experiments(args) -> None:
     t = _tables()
+    todo = set(args.experiments or EXPERIMENTS)
     for s in args.scenarios:
         dev = _dev(s, args.sample)
-        experiments.vif(dev, s).to_csv(t / f"vif_{s}.csv", index=False)
-        experiments.ablation(dev, s).to_csv(t / f"ablacion_{s}.csv", index=False)
-        experiments.isolation_forest(dev, s).to_csv(t / f"isolation_forest_{s}.csv", index=False)
-        experiments.validation_curve_lgbm(dev, s).to_csv(t / f"curva_validacion_{s}.csv", index=False)
-        experiments.balancing_best_model(dev, s).to_csv(t / f"balanceo_lgbm_{s}.csv", index=False)
+        if "vif" in todo:
+            experiments.vif(dev, s).to_csv(t / f"vif_{s}.csv", index=False)
+        if "ablacion" in todo:
+            experiments.ablation(dev, s).to_csv(t / f"ablacion_{s}.csv", index=False)
+        if "isolation_forest" in todo:
+            experiments.isolation_forest(dev, s).to_csv(t / f"isolation_forest_{s}.csv", index=False)
+        if "curva_validacion" in todo:
+            experiments.validation_curve_lgbm(dev, s).to_csv(t / f"curva_validacion_{s}.csv", index=False)
+        if "balanceo_lgbm" in todo:
+            experiments.balancing_best_model(dev, s).to_csv(t / f"balanceo_lgbm_{s}.csv", index=False)
         if s == "A":
-            experiments.resampling_comparison(dev, s).to_csv(t / "balanceo_A.csv", index=False)
-            experiments.leakage_demo(dev, s).to_csv(t / "fuga_smote_A.csv", index=False)
-            experiments.leakage_demo(dev, s, multiclass=True).to_csv(
-                t / "fuga_smote_multiclase_A.csv", index=False)
-            experiments.multiclass(dev, s).to_csv(t / "multiclase_A.csv", index=False)
+            if "balanceo_arbol" in todo:
+                experiments.resampling_comparison(dev, s).to_csv(t / "balanceo_A.csv", index=False)
+            if "fuga" in todo:
+                experiments.leakage_demo(dev, s).to_csv(t / "fuga_smote_A.csv", index=False)
+                experiments.leakage_demo(dev, s, multiclass=True).to_csv(
+                    t / "fuga_smote_multiclase_A.csv", index=False)
+            if "multiclase" in todo:
+                experiments.multiclass(dev, s).to_csv(t / "multiclase_A.csv", index=False)
         log.info("Experimentos del escenario %s listos", s)
 
 
@@ -156,14 +170,15 @@ def cmd_interpret(args) -> None:
     t = _tables()
     for s in args.scenarios:
         dev = _dev(s, args.sample)
-        spec, params = _best_tree_spec(s, args.model)
+        spec, params = _best_tree_spec(s, args.model or config.load_config().get("interpret_model"))
         log.info("Interpretando %s en escenario %s con %s", spec.name, s, params)
         table, last = interpret.shap_by_fold(dev, s, spec)
         table.to_csv(t / f"shap_{s}.csv")
         pd.to_pickle(last, config.path("processed_dir") / f"shap_ultimo_pliegue_{s}.pkl")
 
-        oof = pd.read_parquet(config.path("processed_dir") / f"oof_{s}.parquet")
-        oof = oof[oof.modelo == spec.name]
+        oof_all = pd.read_parquet(config.path("processed_dir") / f"oof_{s}.parquet")
+        evaluate.capture_at_top(oof_all).to_csv(t / f"captura_topk_{s}.csv", index=False)
+        oof = oof_all[oof_all.modelo == spec.name]
         segs = ["school", "region", "first.generation", "scholarship.type", "foreign"]
         interpret.error_analysis(oof, dev, segs).to_csv(t / f"errores_{s}.csv", index=False)
         cm = pd.crosstab(oof.y.map({0: "Retenido", 1: "Deserción"}),
@@ -200,7 +215,9 @@ def cmd_figures(args) -> None:
     shp = {s: pd.read_csv(t / f"shap_{s}.csv", index_col=0) for s in args.scenarios
            if (t / f"shap_{s}.csv").exists()}
     if shp:
-        plots.shap_importance(shp, f / "fig07_shap_importancia.png")
+        name = args.model or config.load_config().get("interpret_model")
+        titles = {s: f"Escenario {s} — {_best_tree_spec(s, name)[0].name}" for s in shp}
+        plots.shap_importance(shp, f / "fig07_shap_importancia.png", titles)
         last = config.path("processed_dir") / "shap_ultimo_pliegue_B.pkl"
         if last.exists():
             plots.shap_beeswarm(pd.read_pickle(last), f / "fig08_shap_beeswarm_B.png")
@@ -210,7 +227,12 @@ def cmd_report(args) -> None:
     dst = config.path("report_figures_dir")
     for fig in _figures().glob("*.png"):
         shutil.copy2(fig, dst / fig.name)
-    log.info("Figuras copiadas a %s", dst)
+    summaries = {s: pd.read_csv(_tables() / f"cv_resumen_{s}.csv", index_col=0) for s in ("A", "B")
+                 if (_tables() / f"cv_resumen_{s}.csv").exists()}
+    if summaries:
+        tex = report.results_table(summaries, _tables() / "tabla_resultados.tex")
+        shutil.copy2(tex, dst.parent / "tabla_resultados.tex")
+    log.info("Figuras y tablas copiadas a %s", dst.parent)
 
 
 def cmd_all(args) -> None:
@@ -226,6 +248,8 @@ def main(argv: list[str] | None = None) -> None:
                                          "figures", "report", "all"])
     parser.add_argument("--scenarios", nargs="+", default=["A", "B"], choices=["A", "B"])
     parser.add_argument("--models", nargs="+", default=None, help="Subconjunto de modelos a entrenar.")
+    parser.add_argument("--experiments", nargs="+", default=None, choices=EXPERIMENTS,
+                        help="Subconjunto de experimentos (por defecto, todos).")
     parser.add_argument("--model", default=None, help="Modelo a interpretar (por defecto, el mejor de árboles).")
     parser.add_argument("--sample", type=float, default=None,
                         help="Fracción del conjunto de desarrollo (solo para pruebas rápidas).")

@@ -56,3 +56,13 @@ def test_compare_models_detects_identical():
                           "pr_auc": [0.5, 0.52, 0.51, 0.49, 0.5] * 2})
     r = compare_models(folds, "a", "b", "pr_auc", n_train=800, n_test=200)
     assert r["diferencia"] == 0
+
+
+def test_original_variable_mapping():
+    from desercion.interpret import original_variable
+
+    originals = ["school", "school.cost", "PNA", "program"]
+    assert original_variable("school.cost_High cost", originals) == "school.cost"
+    assert original_variable("school_EIC", originals) == "school"
+    assert original_variable("missingindicator_PNA", originals) == "PNA"
+    assert original_variable("program_infrequent_sklearn", originals) == "program"

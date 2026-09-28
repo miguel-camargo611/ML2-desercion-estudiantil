@@ -147,7 +147,8 @@ def leakage(demo: pd.DataFrame, path: Path) -> Path:
         for xi, v in zip(x, vals, strict=True):
             ax.text(xi + (i - 0.5) * (w + 0.02), v + 0.01, _num(v), ha="center", fontsize=7,
                     color=INK2)
-    ax.set_xticks(x, [c.removeprefix("f1_").replace("_", " ").capitalize() for c in cols])
+    labels = [c.removeprefix("f1_").replace("_", " ").capitalize() for c in cols]
+    ax.set_xticks(x, [lbl.replace(" ", "\n", 1) if len(lbl) > 12 else lbl for lbl in labels])
     ax.set_ylabel("F1 (media 5 pliegues)")
     ax.set_ylim(0, 1.08)
     ax.grid(axis="x", visible=False)
@@ -163,12 +164,12 @@ def ablation(abl: dict[str, pd.DataFrame], path: Path) -> Path:
         y = np.arange(len(g))
         ax.barh(y, g["mean"], xerr=g["std"], color=BLUE, height=0.6,
                 error_kw={"ecolor": INK2, "lw": 1, "capsize": 2})
-        for yi, v in zip(y, g["mean"], strict=True):
-            ax.text(v + 0.02, yi, _num(v), va="center", fontsize=7, color=INK2)
+        for yi, v, sd in zip(y, g["mean"], g["std"], strict=True):
+            ax.text(v + sd + 0.008, yi, _num(v), va="center", fontsize=7, color=INK2)
         ax.set_yticks(y, g.index)
         ax.invert_yaxis()
-        ax.set_xlim(0, max(0.8, g["mean"].max() + 0.12))
-        ax.set_xlabel("PR-AUC (LightGBM)")
+        ax.set_xlim(0, 0.3)
+        ax.set_xlabel("PR-AUC (LightGBM sin SMOTE)")
         ax.set_title(f"Escenario {s}")
         ax.grid(axis="y", visible=False)
     fig.tight_layout()
@@ -197,7 +198,8 @@ def validation_curve(curves: dict[str, pd.DataFrame], path: Path) -> Path:
 
 
 # -------------------------------------------------------------- interpretación
-def shap_importance(tables: dict[str, pd.DataFrame], path: Path, top: int = 12) -> Path:
+def shap_importance(tables: dict[str, pd.DataFrame], path: Path, titles: dict[str, str] | None = None,
+                    top: int = 12) -> Path:
     fig, axes = plt.subplots(1, len(tables), figsize=(7.2, 3.3))
     axes = np.atleast_1d(axes)
     for ax, (s, t) in zip(axes, tables.items(), strict=True):
@@ -205,17 +207,25 @@ def shap_importance(tables: dict[str, pd.DataFrame], path: Path, top: int = 12) 
         ax.barh(t.index, t["media"], xerr=t["sd"], color=BLUE, height=0.65,
                 error_kw={"ecolor": INK2, "lw": 1, "capsize": 2})
         ax.set_xlabel("|SHAP| medio (log-odds)")
-        ax.set_title(f"Escenario {s}")
+        ax.set_title((titles or {}).get(s, f"Escenario {s}"))
         ax.grid(axis="y", visible=False)
         ax.tick_params(axis="y", labelsize=7.5)
     fig.tight_layout()
     return _save(fig, path)
 
 
-def shap_beeswarm(last: dict, path: Path, top: int = 12) -> Path:
-    plt.figure()
-    shap.summary_plot(last["shap"], last["X"], max_display=top, show=False, plot_size=(6.2, 3.8),
+def shap_beeswarm(last: dict, path: Path, top: int = 8) -> Path:
+    """Beeswarm de las variables numéricas (el color solo tiene sentido en una escala ordenada)."""
+    X = last["X"].apply(pd.to_numeric, errors="coerce")
+    keep = [i for i, c in enumerate(X.columns) if X[c].notna().any()]
+    shap.summary_plot(last["shap"][:, keep], X.iloc[:, keep], max_display=top, show=False,
+                      plot_size=(7.0, 3.2),
                       color_bar_label="Valor de la variable")
     fig = plt.gcf()
-    fig.axes[0].set_xlabel("Valor SHAP (impacto en log-odds de desertar)")
+    ax, cbar = fig.axes[0], fig.axes[-1]
+    ax.set_xlabel("Valor SHAP (impacto en log-odds de desertar)", fontsize=9)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.tick_params(axis="x", labelsize=8)
+    cbar.set_yticklabels(["Bajo", "Alto"], fontsize=8)
+    cbar.set_ylabel("Valor de la variable", fontsize=8)
     return _save(fig, path)

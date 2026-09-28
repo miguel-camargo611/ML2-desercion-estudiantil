@@ -191,7 +191,8 @@ def ablation(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
         num, cat = feature_lists(scenario, groups)
         X = dev[num + cat]
         for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            pipe = build_pipeline(_lgbm_spec(seed), num, cat)
+            # Sin SMOTE: en A empeora el PR-AUC y en B es neutro (ver balancing_best_model).
+            pipe = build_pipeline(_lgbm_spec(seed), num, cat, sampler=None)
             oof = cross_val_predict(clone(pipe), X.iloc[tr], y.iloc[tr], groups=g.iloc[tr],
                                     cv=_outer(seed + 2, 3), method="predict_proba")[:, 1]
             thr = best_threshold(y.iloc[tr].to_numpy(), oof, beta)
