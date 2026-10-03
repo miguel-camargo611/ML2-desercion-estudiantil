@@ -1,39 +1,56 @@
 import numpy as np
 
 from desercion import data
-from desercion.features import EXCLUDED, SCENARIO_GROUPS, feature_lists
+from desercion.features import (
+    CANDIDATES,
+    DROPPED_BY_SELECTION,
+    EXCLUDED,
+    KEPT_ENGINEERED,
+    add_engineered,
+    feature_lists,
+)
 
 
 def test_clean_converts_mixed_columns(raw_like):
     df = data.clean(raw_like)
     assert df["admission.test"].dtype.kind == "f"
     assert df["general.math.eval"].dtype.kind == "f"
-    assert df["admission.test"].isna().sum() == (raw_like.index % 7 == 0).sum()
+    sin_examen = raw_like.index % 7 == 0
+    en_linea = raw_like.index % 13 == 0
+    assert df["admission.test"].isna().sum() == (sin_examen | en_linea).sum()
     assert not (df["PNA"] == 0).any()
     assert not (df["english.evaluation"] == 0).any()
 
 
-def test_targets_consistent(raw_like):
+def test_admission_scales_are_separated(raw_like):
+    """El examen en línea (0-100) no debe mezclarse con el presencial (400-1600)."""
+    df = data.clean(raw_like)
+    assert (df["admission.test"].dropna() > 100).all()
+    assert (df["admission.test.online"].dropna() <= 100).all()
+    assert df["admission.test.online"].notna().sum() == (raw_like.index % 13 == 0).sum()
+
+
+def test_target_is_binary_and_consistent(raw_like):
     df = data.add_targets(data.clean(raw_like))
     assert set(df[data.TARGET]) <= {0, 1}
     assert (df[data.TARGET] == (df["retention"] == 0)).all()
-    # la versión multiclase es 0 si y solo si el estudiante fue retenido
-    assert ((df[data.TARGET_MULTI] == 0) == (df[data.TARGET] == 0)).all()
 
 
-def test_no_leaky_columns_in_features():
-    leaky = {"retention", "dropout.semester", "student.id", "generation"}
-    for scenario in SCENARIO_GROUPS:
-        num, cat = feature_lists(scenario)
-        assert not leaky & set(num + cat)
-        assert not set(EXCLUDED) & set(num + cat)
+def test_no_leaky_or_unusable_columns_in_features():
+    num, cat = feature_lists()
+    used = set(num + cat)
+    assert not {"retention", "dropout.semester", "student.id", "generation"} & used
+    assert not set(EXCLUDED) & used
+    assert not set(DROPPED_BY_SELECTION) & used
+    assert {"socioeconomic.level", "social.lag"}.isdisjoint(CANDIDATES["num"] + CANDIDATES["cat"])
 
 
-def test_first_period_only_in_scenario_b():
-    num_a, _ = feature_lists("A")
-    num_b, _ = feature_lists("B")
-    assert "average.first.period" not in num_a
-    assert "average.first.period" in num_b
+def test_engineered_features_are_row_wise(raw_like):
+    df = add_engineered(data.clean(raw_like))
+    gap = df["average.first.period"] - df["PNA"]
+    assert np.allclose(df["brecha.promedio"], gap, equal_nan=True)
+    num, _ = feature_lists()
+    assert set(KEPT_ENGINEERED) <= set(num)
 
 
 def test_split_is_grouped_and_stratified(raw_like):
@@ -49,9 +66,25 @@ def test_split_is_grouped_and_stratified(raw_like):
     assert np.isclose(rate_dev, rate_test, atol=0.06)
 
 
-def test_scenario_b_excludes_first_semester_dropouts(raw_like):
+def test_study_frame_population(raw_like):
     df = data.add_targets(data.clean(raw_like))
     split = data.make_split(df, test_size=0.2, seed=1)
-    b = data.scenario_frame(df, "B", split, "dev")
-    assert (b["dropout.semester"] != 1).all()
-    assert set(b["generation"]) <= {"AD19", "AD20"}
+    dev = data.study_frame(df, split, "dev")
+    assert (dev["dropout.semester"] != 1).all()
+    assert set(dev["generation"]) <= {"AD19", "AD20"}
+    assert (split.loc[dev.index] == "dev").all()
+
+
+def test_raw_file_is_found_with_any_name(tmp_path, monkeypatch):
+    import pytest
+
+    from desercion import config
+
+    monkeypatch.setattr(config, "path", lambda key: tmp_path)
+    with pytest.raises(FileNotFoundError, match="data/raw"):
+        data.find_raw_file()
+    (tmp_path / "cualquier nombre.xlsx").touch()
+    assert data.find_raw_file().name == "cualquier nombre.xlsx"
+    (tmp_path / "otro.xlsx").touch()
+    with pytest.raises(FileNotFoundError, match="2 archivos"):
+        data.find_raw_file()

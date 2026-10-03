@@ -12,7 +12,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from desercion import config
 from desercion.data import GROUP, TARGET
 from desercion.features import feature_lists
-from desercion.models import ModelSpec, build_pipeline
+from desercion.models import ModelSpec, tuned_pipeline
 
 log = logging.getLogger(__name__)
 
@@ -33,14 +33,15 @@ def _shap_matrix(explainer, X) -> np.ndarray:
     return values[..., 1] if values.ndim == 3 else values
 
 
-def shap_by_fold(dev: pd.DataFrame, scenario: str, spec: ModelSpec, n_sample: int = 2000) -> tuple[pd.DataFrame, dict]:
+def shap_by_fold(dev: pd.DataFrame, spec: ModelSpec, params: dict,
+                 n_sample: int = 2000) -> tuple[pd.DataFrame, dict]:
     """Ajusta el modelo en cada pliegue externo y calcula |SHAP| medio en su validación.
 
     Devuelve la importancia agregada por variable original en cada pliegue (para medir
     estabilidad) y los insumos del último pliegue para el gráfico *beeswarm*.
     """
     seed = config.seed()
-    num, cat = feature_lists(scenario)
+    num, cat = feature_lists()
     originals = num + cat
     X, y, g = dev[originals], dev[TARGET], dev[GROUP]
     outer = StratifiedGroupKFold(n_splits=config.load_config()["cv"]["outer_folds"], shuffle=True,
@@ -48,18 +49,19 @@ def shap_by_fold(dev: pd.DataFrame, scenario: str, spec: ModelSpec, n_sample: in
     rng = np.random.default_rng(seed)
     rows, last = [], {}
     for k, (tr, va) in enumerate(outer.split(X, y, g)):
-        pipe = build_pipeline(spec, num, cat).fit(X.iloc[tr], y.iloc[tr])
+        pipe = tuned_pipeline(spec, params, num, cat).fit(X.iloc[tr], y.iloc[tr])
         va_s = rng.choice(va, size=min(n_sample, len(va)), replace=False)
         Xv = pipe.named_steps["prep"].transform(X.iloc[va_s])
         names = list(pipe.named_steps["prep"].get_feature_names_out())
-        sv = _shap_matrix(shap.TreeExplainer(pipe.named_steps["clf"]), Xv)
+        clf = pipe.named_steps["clf"]
+        sv = _shap_matrix(shap.TreeExplainer(getattr(clf, "model_", clf)), Xv)
         # Por aditividad de SHAP, la contribución de una variable original es la suma (con signo)
         # de las de sus columnas transformadas; luego se promedia el valor absoluto.
         per_var = pd.DataFrame(sv, columns=names).T.groupby(
             [original_variable(f, originals) for f in names]).sum().T
         rows.append(per_var.abs().mean(axis=0).rename(k))
         last = {"shap": sv, "X": pd.DataFrame(np.asarray(Xv), columns=names)}
-        log.info("SHAP %s pliegue %d listo", scenario, k)
+        log.info("SHAP pliegue %d listo", k)
     table = pd.concat(rows, axis=1)
     table.columns = [f"pliegue_{c}" for c in table.columns]
     table["media"] = table.mean(axis=1)

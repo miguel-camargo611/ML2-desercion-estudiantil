@@ -1,16 +1,22 @@
-"""Experimentos que reproducen (y ponen a prueba) decisiones concretas del artículo base.
+"""Selección de variables y experimentos que reproducen (y ponen a prueba) decisiones del artículo.
 
-1. ``resampling_comparison``  – SMOTE vs ADASYN con un árbol de decisión de control (Tabla 6).
-2. ``leakage_demo``           – protocolo del artículo (SMOTE antes de partir) vs Pipeline correcto.
-3. ``isolation_forest``       – ¿son los desertores "anomalías"? (etapas 1 y 2 del artículo).
-4. ``ablation``               – pregunta de investigación: socioeconómicas vs académicas.
-5. ``multiclass``             – formulación de tres clases análoga a Graduate/Enrolled/Dropout.
-6. ``vif``                    – ¿se replica la multicolinealidad que llevó a descartar la RL?
+1. ``feature_engineering_check`` – ¿aportan las variables construidas?
+2. ``feature_selection``         – importancia por permutación dentro de cada partición.
+3. ``resampling_comparison``     – SMOTE vs ADASYN con un árbol de decisión de control (artículo).
+4. ``leakage_demo``              – protocolo del artículo (SMOTE antes de partir) vs Pipeline.
+5. ``isolation_forest``          – ¿son los desertores "anomalías"? (etapas 1 y 2 del artículo).
+6. ``vif``                       – multicolinealidad que llevó al artículo a descartar la RL.
+7. ``validation_curve``          – desempeño en entrenamiento y validación según un hiperparámetro.
+8. ``computational_cost``        – tiempos de búsqueda, ajuste y predicción, y tamaño del modelo.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import pickle
+import platform
+import time
 
 import numpy as np
 import pandas as pd
@@ -18,22 +24,22 @@ from imblearn.over_sampling import ADASYN, SMOTE
 from lightgbm import LGBMClassifier
 from sklearn.base import clone
 from sklearn.ensemble import IsolationForest
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, f1_score, recall_score, roc_auc_score
-from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold, cross_val_predict
+from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from desercion import config
-from desercion.data import GROUP, MULTI_LABELS, TARGET, TARGET_MULTI
-from desercion.evaluate import best_threshold, binary_metrics
-from desercion.features import GROUPS, feature_lists, make_preprocessor
-from desercion.models import ModelSpec, build_pipeline, get_specs
+from desercion.data import GROUP, TARGET
+from desercion.features import ENGINEERED, feature_lists, make_preprocessor
+from desercion.models import ModelSpec, build_pipeline, params_from_text, tuned_pipeline
 
 log = logging.getLogger(__name__)
 
-# Configuración fija de LightGBM para experimentos (la elegida en todos los pliegues de la CV anidada
-# con la rejilla inicial).
-LGBM_FIXED = dict(n_estimators=300, num_leaves=15, learning_rate=0.05, subsample=0.8,
+# Configuración fija de LightGBM para los experimentos (cercana a la elegida por la CV anidada).
+LGBM_FIXED = dict(n_estimators=400, num_leaves=8, learning_rate=0.05, subsample=0.8,
                   subsample_freq=1, colsample_bytree=0.8, verbose=-1)
 
 
@@ -46,23 +52,105 @@ def _lgbm_spec(seed: int, **extra) -> ModelSpec:
                      LGBMClassifier(random_state=seed, n_jobs=-1, **{**LGBM_FIXED, **extra}))
 
 
-# -------------------------------------------------------------- 1. SMOTE vs ADASYN
-def resampling_comparison(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
+def _logit_spec(seed: int) -> ModelSpec:
+    return ModelSpec("Regresión logística", "", LogisticRegression(C=0.01, max_iter=5000,
+                                                                     random_state=seed))
+
+
+def _cv_pr_auc(dev: pd.DataFrame, num: list[str], cat: list[str], spec: ModelSpec,
+               seed: int) -> list[float]:
+    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
+    out = []
+    for tr, va in _outer(seed).split(X, y, g):
+        pipe = build_pipeline(spec, num, cat).fit(X.iloc[tr], y.iloc[tr])
+        out.append(average_precision_score(y.iloc[va], pipe.predict_proba(X.iloc[va])[:, 1]))
+    return out
+
+
+# --------------------------------------------------- 1. Variables construidas
+def feature_engineering_check(dev: pd.DataFrame) -> pd.DataFrame:
+    """PR-AUC por pliegue sin y con cada variable construida (LightGBM y regresión logística)."""
     seed = config.seed()
-    num, cat = feature_lists(scenario)
+    variants = {"Sin variables construidas": list(ENGINEERED)}
+    variants.update({f"+ {v}": [o for o in ENGINEERED if o != v] for v in ENGINEERED})
+    variants["+ ambas"] = []
+    rows = []
+    for name, drop in variants.items():
+        num, cat = feature_lists(engineered=list(ENGINEERED), selected=False, drop=drop)
+        for spec in (_lgbm_spec(seed), _logit_spec(seed)):
+            for k, v in enumerate(_cv_pr_auc(dev, num, cat, spec, seed)):
+                rows.append({"variante": name, "modelo": spec.name, "pliegue": k, "pr_auc": v})
+        log.info("Variables construidas | %s listo", name)
+    return pd.DataFrame(rows)
+
+
+# ----------------------------------------------------- 2. Selección de variables
+def feature_selection(dev: pd.DataFrame, n_repeats: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Selección por importancia de permutación, ajustada dentro de cada partición.
+
+    En cada pliegue externo, la importancia (caída del PR-AUC al permutar la variable) se mide
+    con una validación cruzada interna sobre el entrenamiento; se conservan las variables con
+    importancia positiva. Luego se compara, en la validación externa, el modelo con todas las
+    variables y con las seleccionadas. Devuelve (importancias por pliegue, PR-AUC por pliegue).
+    """
+    seed = config.seed()
+    num, cat = feature_lists(selected=False)
+    cols = num + cat
+    X, y, g = dev[cols], dev[TARGET], dev[GROUP]
+    imp_rows, score_rows = [], []
+    for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
+        X_tr, y_tr, g_tr = X.iloc[tr], y.iloc[tr], g.iloc[tr]
+        inner = []
+        for itr, iva in _outer(seed + 3, 3).split(X_tr, y_tr, g_tr):
+            pipe = build_pipeline(_lgbm_spec(seed), num, cat).fit(X_tr.iloc[itr], y_tr.iloc[itr])
+            r = permutation_importance(pipe, X_tr.iloc[iva], y_tr.iloc[iva],
+                                       scoring="average_precision", n_repeats=n_repeats,
+                                       random_state=seed, n_jobs=1)
+            inner.append(r.importances_mean)
+        imp = pd.Series(np.mean(inner, axis=0), index=cols)
+        keep = imp[imp > 0].index.tolist()
+        for c in cols:
+            imp_rows.append({"variable": c, "pliegue": k, "importancia": imp[c],
+                             "seleccionada": c in keep})
+        k_num, k_cat = [c for c in num if c in keep], [c for c in cat if c in keep]
+        for label, (n_, c_) in {"Todas las candidatas": (num, cat),
+                                "Seleccionadas": (k_num, k_cat)}.items():
+            for spec in (_lgbm_spec(seed), _logit_spec(seed)):
+                pipe = build_pipeline(spec, n_, c_).fit(X_tr[n_ + c_], y_tr)
+                s = pipe.predict_proba(X.iloc[va][n_ + c_])[:, 1]
+                score_rows.append({"conjunto": label, "modelo": spec.name, "pliegue": k,
+                                   "n_variables": len(n_) + len(c_),
+                                   "pr_auc": average_precision_score(y.iloc[va], s)})
+        log.info("Selección | pliegue %d: %d de %d variables", k, len(keep), len(cols))
+    return pd.DataFrame(imp_rows), pd.DataFrame(score_rows)
+
+
+def selection_check(dev: pd.DataFrame, drop: list[str]) -> pd.DataFrame:
+    """Verifica en particiones nuevas (otra semilla) que quitar ``drop`` no empeora el PR-AUC."""
+    seed = config.seed() + 10
+    rows = []
+    for label, d in {"Todas las candidatas": [], "Seleccionadas": drop}.items():
+        num, cat = feature_lists(selected=False, drop=d)
+        for spec in (_lgbm_spec(seed), _logit_spec(seed)):
+            for k, v in enumerate(_cv_pr_auc(dev, num, cat, spec, seed)):
+                rows.append({"conjunto": label, "modelo": spec.name, "pliegue": k,
+                             "n_variables": len(num) + len(cat), "pr_auc": v})
+    return pd.DataFrame(rows)
+
+
+# -------------------------------------------------------------- 3. SMOTE vs ADASYN
+def resampling_comparison(dev: pd.DataFrame) -> pd.DataFrame:
+    """Réplica de la comparación del artículo: árbol de control sin balanceo, SMOTE y ADASYN."""
+    seed = config.seed()
+    num, cat = feature_lists()
     X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
     control = ModelSpec("Árbol de control", "", DecisionTreeClassifier(random_state=seed))
-    variants = {
-        "Sin balanceo": (control, None),
-        "Pesos de clase": (ModelSpec("Árbol", "", DecisionTreeClassifier(
-            random_state=seed, class_weight="balanced")), None),
-        "SMOTE": (control, SMOTE(random_state=seed)),
-        "ADASYN": (control, ADASYN(random_state=seed)),
-    }
+    variants = {"Sin balanceo": "passthrough", "SMOTE": SMOTE(random_state=seed),
+                "ADASYN": ADASYN(random_state=seed)}
     rows = []
-    for name, (spec, sampler) in variants.items():
+    for name, sampler in variants.items():
         for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            pipe = build_pipeline(spec, num, cat, sampler=sampler).fit(X.iloc[tr], y.iloc[tr])
+            pipe = build_pipeline(control, num, cat, sampler=sampler).fit(X.iloc[tr], y.iloc[tr])
             yv, pred = y.iloc[va].to_numpy(), pipe.predict(X.iloc[va])
             rows.append({"tecnica": name, "pliegue": k,
                          "f1_retenido": f1_score(1 - yv, 1 - pred),
@@ -73,33 +161,8 @@ def resampling_comparison(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def balancing_best_model(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
-    """¿Aporta SMOTE al mejor modelo? LightGBM sin balanceo, con pesos de clase y con SMOTE.
-
-    Se mide con métricas independientes del umbral (PR-AUC, ROC-AUC): el balanceo puede
-    desplazar las probabilidades sin mejorar la capacidad de ordenar a los estudiantes por riesgo.
-    """
-    seed = config.seed()
-    num, cat = feature_lists(scenario)
-    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
-    variants = {
-        "Sin balanceo": ({}, None),
-        "Pesos de clase": ({"class_weight": "balanced"}, None),
-        "SMOTE": ({}, SMOTE(random_state=seed)),
-    }
-    rows = []
-    for name, (extra, sampler) in variants.items():
-        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            pipe = build_pipeline(_lgbm_spec(seed, **extra), num, cat, sampler=sampler)
-            s = pipe.fit(X.iloc[tr], y.iloc[tr]).predict_proba(X.iloc[va])[:, 1]
-            yv = y.iloc[va].to_numpy()
-            rows.append({"tecnica": name, "pliegue": k, "pr_auc": average_precision_score(yv, s),
-                         "roc_auc": roc_auc_score(yv, s), "prob_media": float(s.mean())})
-    return pd.DataFrame(rows)
-
-
-# -------------------------------------------------- 2. Demostración de fuga (SMOTE)
-def leakage_demo(dev: pd.DataFrame, scenario: str, multiclass: bool = False) -> pd.DataFrame:
+# -------------------------------------------------- 4. Demostración de fuga (SMOTE)
+def leakage_demo(dev: pd.DataFrame) -> pd.DataFrame:
     """Compara el protocolo del artículo con el Pipeline sin fuga, mismo modelo e hiperparámetros.
 
     - "Artículo (SMOTE antes de partir)": se preprocesa y sobremuestrea TODO el conjunto y luego
@@ -108,26 +171,19 @@ def leakage_demo(dev: pd.DataFrame, scenario: str, multiclass: bool = False) -> 
     - "Pipeline (SMOTE dentro del pliegue)": el remuestreo solo ve el entrenamiento de cada pliegue.
     """
     seed = config.seed()
-    num, cat = feature_lists(scenario)
-    target = TARGET_MULTI if multiclass else TARGET
-    X, y = dev[num + cat], dev[target].to_numpy()
-    labels = sorted(np.unique(y))
-    names = [MULTI_LABELS[c] for c in labels] if multiclass else ["Retenido", "Deserción"]
+    num, cat = feature_lists()
+    X, y = dev[num + cat], dev[TARGET].to_numpy()
     clf = LGBMClassifier(random_state=seed, n_jobs=-1, **LGBM_FIXED)
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     rows = []
 
     def _record(protocol, k, yv, pred, proba):
-        f1s = f1_score(yv, pred, labels=labels, average=None)
-        row = {"protocolo": protocol, "pliegue": k,
-               "f1_ponderado": f1_score(yv, pred, average="weighted"),
-               "f1_macro": f1_score(yv, pred, average="macro")}
-        row.update({f"f1_{n}": v for n, v in zip(names, f1s, strict=True)})
-        if not multiclass:  # métrica independiente del umbral
-            row["pr_auc"] = average_precision_score(yv, proba[:, 1])
-        rows.append(row)
+        rows.append({"protocolo": protocol, "pliegue": k,
+                     "f1_ponderado": f1_score(yv, pred, average="weighted"),
+                     "f1_Retenido": f1_score(1 - yv, 1 - pred),
+                     "f1_Deserción": f1_score(yv, pred),
+                     "pr_auc": average_precision_score(yv, proba[:, 1])})
 
-    # Protocolo del artículo
     Xt = make_preprocessor(num, cat).fit_transform(X)
     Xr, yr = SMOTE(random_state=seed).fit_resample(Xt, y)
     for k, (tr, va) in enumerate(cv.split(Xr, yr)):
@@ -135,19 +191,18 @@ def leakage_demo(dev: pd.DataFrame, scenario: str, multiclass: bool = False) -> 
         _record("Artículo (SMOTE antes de partir)", k, yr[va], m.predict(Xr[va]),
                 m.predict_proba(Xr[va]))
 
-    # Pipeline correcto
     spec = ModelSpec("LightGBM", "", clf)
     for k, (tr, va) in enumerate(cv.split(X, y)):
-        pipe = build_pipeline(spec, num, cat).fit(X.iloc[tr], y[tr])
+        pipe = build_pipeline(spec, num, cat, sampler=SMOTE(random_state=seed)).fit(X.iloc[tr], y[tr])
         _record("Pipeline (SMOTE dentro del pliegue)", k, y[va], pipe.predict(X.iloc[va]),
                 pipe.predict_proba(X.iloc[va]))
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------ 3. Isolation Forest
-def isolation_forest(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
+# ------------------------------------------------------------ 5. Isolation Forest
+def isolation_forest(dev: pd.DataFrame) -> pd.DataFrame:
     seed = config.seed()
-    num, cat = feature_lists(scenario)
+    num, cat = feature_lists()
     X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
     rows = []
     for stage, contamination in [("Etapa 1 (auto)", "auto"), ("Etapa 2 (0,5)", 0.5)]:
@@ -166,104 +221,81 @@ def isolation_forest(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------------ 4. Ablación
-ABLATION_SETS = {
-    "A": {
-        "Socioeconómicas": ["socioeconomicas"],
-        "Demográficas + socioeconómicas": ["demograficas", "socioeconomicas"],
-        "Académicas de ingreso": ["academicas_ingreso"],
-        "Institucionales": ["institucionales"],
-        "Todo al ingreso": ["demograficas", "socioeconomicas", "academicas_ingreso",
-                            "institucionales"],
-    },
-    "B": {
-        "Demográficas + socioeconómicas": ["demograficas", "socioeconomicas"],
-        "Todo al ingreso": ["demograficas", "socioeconomicas", "academicas_ingreso",
-                            "institucionales"],
-        "Solo primer periodo": ["primer_periodo"],
-        "Ingreso + primer periodo": list(GROUPS),
-    },
-}
-
-
-def ablation(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
-    seed = config.seed()
-    beta = config.load_config()["metrics"]["threshold_beta"]
-    y, g = dev[TARGET], dev[GROUP]
-    rows = []
-    for set_name, groups in ABLATION_SETS[scenario].items():
-        num, cat = feature_lists(scenario, groups)
-        X = dev[num + cat]
-        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            # Sin SMOTE: en A empeora el PR-AUC y en B es neutro (ver balancing_best_model).
-            pipe = build_pipeline(_lgbm_spec(seed), num, cat, sampler=None)
-            oof = cross_val_predict(clone(pipe), X.iloc[tr], y.iloc[tr], groups=g.iloc[tr],
-                                    cv=_outer(seed + 2, 3), method="predict_proba")[:, 1]
-            thr = best_threshold(y.iloc[tr].to_numpy(), oof, beta)
-            pipe.fit(X.iloc[tr], y.iloc[tr])
-            s = pipe.predict_proba(X.iloc[va])[:, 1]
-            m = binary_metrics(y.iloc[va].to_numpy(), s, (s >= thr).astype(int), beta)
-            rows.append({"conjunto": set_name, "pliegue": k, "n_variables": len(num) + len(cat), **m})
-        log.info("Ablación %s | %s listo", scenario, set_name)
-    return pd.DataFrame(rows)
-
-
-# ---------------------------------------------------------------- 5. Multiclase
-def multiclass(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
-    seed = config.seed()
-    num, cat = feature_lists(scenario)
-    X, y, g = dev[num + cat], dev[TARGET_MULTI], dev[GROUP]
-    specs = get_specs(seed)
-    chosen = {
-        "Mayoría": specs["Mayoría"],
-        "Árbol sin poda": specs["Árbol sin poda"],
-        "LightGBM": _lgbm_spec(seed),
-        "CatBoost": ModelSpec("CatBoost", "", clone(specs["CatBoost"].estimator).set_params(
-            depth=6, learning_rate=0.1)),
-    }
-    rows = []
-    for name, spec in chosen.items():
-        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            pipe = build_pipeline(spec, num, cat).fit(X.iloc[tr], y.iloc[tr])
-            yv, pred = y.iloc[va].to_numpy(), np.asarray(pipe.predict(X.iloc[va])).ravel().astype(int)
-            f1s = f1_score(yv, pred, labels=[0, 1, 2], average=None, zero_division=0)
-            rec = recall_score(yv, pred, labels=[0, 1, 2], average=None, zero_division=0)
-            rows.append({"modelo": name, "pliegue": k,
-                         **{f"f1_{MULTI_LABELS[c]}": f1s[c] for c in range(3)},
-                         **{f"recall_{MULTI_LABELS[c]}": rec[c] for c in range(3)},
-                         "f1_ponderado": f1_score(yv, pred, average="weighted", zero_division=0),
-                         "f1_macro": f1_score(yv, pred, average="macro", zero_division=0)})
-        log.info("Multiclase %s listo", name)
-    return pd.DataFrame(rows)
-
-
-# ------------------------------------------------------- 7. Curva de validación
-def validation_curve_lgbm(dev: pd.DataFrame, scenario: str,
-                          leaves: tuple[int, ...] = (2, 4, 8, 15, 31, 63, 127)) -> pd.DataFrame:
-    """PR-AUC de entrenamiento y validación de LightGBM según su complejidad (número de hojas)."""
-    seed = config.seed()
-    num, cat = feature_lists(scenario)
-    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
-    rows = []
-    for n_leaves in leaves:
-        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
-            pipe = build_pipeline(_lgbm_spec(seed, num_leaves=n_leaves), num, cat)
-            pipe.fit(X.iloc[tr], y.iloc[tr])
-            for part, idx in (("entrenamiento", tr), ("validación", va)):
-                s = pipe.predict_proba(X.iloc[idx])[:, 1]
-                rows.append({"num_leaves": n_leaves, "pliegue": k, "parte": part,
-                             "pr_auc": average_precision_score(y.iloc[idx], s)})
-        log.info("Curva de validación %s | %d hojas lista", scenario, n_leaves)
-    return pd.DataFrame(rows)
-
-
 # ---------------------------------------------------------------------- 6. VIF
-def vif(dev: pd.DataFrame, scenario: str) -> pd.DataFrame:
-    num, _ = feature_lists(scenario)
-    Xn = dev[num].astype(float)
+def vif(dev: pd.DataFrame, extra: list[str] | None = None) -> pd.DataFrame:
+    """VIF de las numéricas del modelo (``extra`` permite ver el efecto de una variable excluida)."""
+    num, _ = feature_lists()
+    cols = num + (extra or [])
+    Xn = dev[cols].astype(float)
     Xn = Xn.loc[:, Xn.std() > 0]
     Xn = (Xn.fillna(Xn.median()) - Xn.mean()) / Xn.std()
     Xn = Xn.assign(const=1.0)
     out = [{"variable": c, "vif": variance_inflation_factor(Xn.values, i)}
            for i, c in enumerate(Xn.columns) if c != "const"]
     return pd.DataFrame(out).sort_values("vif", ascending=False)
+
+
+# ------------------------------------------------------- 7. Curvas de validación
+def validation_curve(dev: pd.DataFrame, spec: ModelSpec, params: dict, name: str,
+                     values: list) -> pd.DataFrame:
+    """PR-AUC de entrenamiento y validación al variar un hiperparámetro (sesgo y varianza).
+
+    Los demás hiperparámetros quedan en los valores que eligió la validación cruzada anidada,
+    de modo que la curva muestra la sensibilidad alrededor de la configuración seleccionada.
+    """
+    seed = config.seed()
+    num, cat = feature_lists()
+    X, y, g = dev[num + cat], dev[TARGET], dev[GROUP]
+    rows = []
+    for v in values:
+        for k, (tr, va) in enumerate(_outer(seed).split(X, y, g)):
+            pipe = tuned_pipeline(spec, {**params, name: v}, num, cat).fit(X.iloc[tr], y.iloc[tr])
+            for part, idx in (("entrenamiento", tr), ("validación", va)):
+                s = _scores(pipe, X.iloc[idx])
+                rows.append({"modelo": spec.name, "parametro": name, "valor": v, "pliegue": k,
+                             "parte": part, "pr_auc": average_precision_score(y.iloc[idx], s)})
+        log.info("Curva de validación | %s %s=%s lista", spec.name, name, v)
+    return pd.DataFrame(rows)
+
+
+def _scores(pipe, X) -> np.ndarray:
+    if hasattr(pipe, "predict_proba"):
+        return pipe.predict_proba(X)[:, 1]
+    return pipe.decision_function(X)
+
+
+# --------------------------------------------------- 8. Costo computacional
+def computational_cost(dev: pd.DataFrame, folds: pd.DataFrame, specs: dict[str, ModelSpec],
+                       repeats: int = 3) -> pd.DataFrame:
+    """Costo de cada modelo con los hiperparámetros elegidos, sobre todo el conjunto de desarrollo.
+
+    - Búsqueda: tiempo total de la validación cruzada anidada (rejilla + umbral, cinco rondas).
+    - Ajuste: mediana de ``repeats`` entrenamientos del Pipeline completo (incluye SMOTE).
+    - Predicción: tiempo por cada 1.000 estudiantes.
+    - Tamaño: Pipeline serializado con pickle.
+    """
+    num, cat = feature_lists()
+    X, y = dev[num + cat], dev[TARGET]
+    rows = []
+    for name, spec in specs.items():
+        params = folds.loc[folds.modelo == name, "params"].mode().iloc[0]
+        pipe_params = params_from_text(params)
+        fit_t, pred_t = [], []
+        for _ in range(repeats):
+            pipe = tuned_pipeline(spec, pipe_params, num, cat)
+            t0 = time.perf_counter()
+            pipe.fit(X, y)
+            fit_t.append(time.perf_counter() - t0)
+            t0 = time.perf_counter()
+            _scores(pipe, X)
+            pred_t.append(time.perf_counter() - t0)
+        rows.append({"modelo": name,
+                     "busqueda_min": folds.loc[folds.modelo == name, "segundos"].sum() / 60,
+                     "ajuste_s": float(np.median(fit_t)),
+                     "prediccion_ms_por_1000": 1000 * float(np.median(pred_t)) / len(X) * 1000,
+                     "tamano_mb": len(pickle.dumps(pipe)) / 1e6,
+                     "combinaciones": int(np.prod([len(v) for v in spec.grid.values()]))
+                     if spec.grid else 1,
+                     "nucleos": os.cpu_count(), "procesador": platform.processor()})
+        log.info("Costo | %s: ajuste %.1fs", name, rows[-1]["ajuste_s"])
+    return pd.DataFrame(rows)

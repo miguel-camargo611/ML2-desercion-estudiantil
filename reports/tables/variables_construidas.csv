@@ -1,0 +1,41 @@
+variante,modelo,pliegue,pr_auc
+Sin variables construidas,LightGBM,0,0.22484028707164067
+Sin variables construidas,LightGBM,1,0.24071453344310795
+Sin variables construidas,LightGBM,2,0.2249429551408653
+Sin variables construidas,LightGBM,3,0.23452513782770737
+Sin variables construidas,LightGBM,4,0.2694766009967129
+Sin variables construidas,Regresión logística,0,0.2294895633918816
+Sin variables construidas,Regresión logística,1,0.21480325725064287
+Sin variables construidas,Regresión logística,2,0.20523066957273572
+Sin variables construidas,Regresión logística,3,0.21906723921976504
+Sin variables construidas,Regresión logística,4,0.2533116230621562
++ brecha.promedio,LightGBM,0,0.22798641376889106
++ brecha.promedio,LightGBM,1,0.2414958805180321
++ brecha.promedio,LightGBM,2,0.22979996539595665
++ brecha.promedio,LightGBM,3,0.24392477506029392
++ brecha.promedio,LightGBM,4,0.2726420051058747
++ brecha.promedio,Regresión logística,0,0.22901677114508914
++ brecha.promedio,Regresión logística,1,0.21440238169110062
++ brecha.promedio,Regresión logística,2,0.2049680691830458
++ brecha.promedio,Regresión logística,3,0.21980801734503136
++ brecha.promedio,Regresión logística,4,0.25372757025429094
++ materias.problema,LightGBM,0,0.23021271008125255
++ materias.problema,LightGBM,1,0.2409345922944937
++ materias.problema,LightGBM,2,0.2288767447712997
++ materias.problema,LightGBM,3,0.24188362144025316
++ materias.problema,LightGBM,4,0.27450687562222964
++ materias.problema,Regresión logística,0,0.22954447841118175
++ materias.problema,Regresión logística,1,0.21463528195252563
++ materias.problema,Regresión logística,2,0.20527883659428103
++ materias.problema,Regresión logística,3,0.21920075817700868
++ materias.problema,Regresión logística,4,0.25321140154498933
++ ambas,LightGBM,0,0.22419333033388608
++ ambas,LightGBM,1,0.24612343517037402
++ ambas,LightGBM,2,0.2227278336945282
++ ambas,LightGBM,3,0.23664739643078192
++ ambas,LightGBM,4,0.27732625135753175
++ ambas,Regresión logística,0,0.22998114338473344
++ ambas,Regresión logística,1,0.21472431117883783
++ ambas,Regresión logística,2,0.20500518808913945
++ ambas,Regresión logística,3,0.21977410226178828
++ ambas,Regresión logística,4,0.25353116903844786

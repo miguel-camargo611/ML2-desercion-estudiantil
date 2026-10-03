@@ -1,37 +1,24 @@
-# Atajos del flujo. En Windows sin `make`, use directamente: python -m desercion.cli <paso>
+# Atajos del flujo. Sin `make` (p. ej. en Windows), use los comandos de la derecha directamente.
 PY ?= python
 
-.PHONY: install test lint prepare train compare experiments interpret figures report all
+.PHONY: install all eda test lint pdf
 
-install:
+install:                 ## pip install -e ".[dev]"
 	$(PY) -m pip install -e ".[dev]"
 
-test:
+all:                     ## desercion all  (flujo completo, ~2 h)
+	desercion all
+
+eda:                     ## desercion prepare && desercion eda  (minutos)
+	desercion prepare
+	desercion eda
+
+test:                    ## pytest  (datos sintéticos, no requiere el dataset)
 	$(PY) -m pytest
 
-lint:
-	$(PY) -m ruff check src tests
+lint:                    ## ruff check src tests notebooks
+	$(PY) -m ruff check src tests notebooks
 
-prepare:
-	$(PY) -m desercion.cli prepare
-
-train:
-	$(PY) -m desercion.cli train
-
-compare:
-	$(PY) -m desercion.cli compare
-
-experiments:
-	$(PY) -m desercion.cli experiments
-
-interpret:
-	$(PY) -m desercion.cli interpret
-
-figures:
-	$(PY) -m desercion.cli figures
-
-report:
-	$(PY) -m desercion.cli report
-
-all:
-	$(PY) -m desercion.cli all
+pdf:                     ## compila los informes (requiere tectonic)
+	cd reports/segunda_entrega && tectonic segunda_entrega.tex
+	cd reports/primera_entrega && tectonic primera_entrega.tex

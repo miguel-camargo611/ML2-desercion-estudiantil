@@ -8,15 +8,15 @@ DatosPropuestos/
 *.csv.gz
 *.parquet
 
-# --- Modelos entrenados ---
-models/*
-!models/.gitkeep
-
 # --- Material del curso y de terceros (se cita, no se redistribuye) ---
 Indicaciones/
 PapersProyecto/
 ML2 - Microcurriculo.pdf
-Primera_entrega/*.pdf
+# Borrador previo de la Primera entrega (la versión final es primera_entrega.pdf)
+reports/primera_entrega/Propuesta*.pdf
+
+# --- Notas de trabajo del equipo (no forman parte del entregable) ---
+notas/
 
 # --- Entornos y herramientas ---
 .venv/

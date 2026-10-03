@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from desercion.features import GROUPS
+from desercion.features import CANDIDATES
 
 
 @pytest.fixture(scope="session")
@@ -40,6 +40,7 @@ def raw_like() -> pd.DataFrame:
     df.loc[:5, "PNA"] = 0
     df["admission.test"] = rng.integers(900, 1600, n).astype(str).astype(object)
     df.loc[df.index % 7 == 0, "admission.test"] = "Does not apply "
+    df.loc[df.index % 13 == 0, "admission.test"] = "65"  # examen en línea (escala 0-100)
     df["admission.rubric"] = np.where(rng.random(n) < 0.3, np.nan, rng.integers(0, 50, n))
     df["general.math.eval"] = rng.uniform(0, 100, n).round(1).astype(str).astype(object)
     df.loc[df.index % 11 == 0, "general.math.eval"] = "No information"
@@ -59,6 +60,7 @@ def raw_like() -> pd.DataFrame:
     for c in ["id.school.origin", "father.education.complete", "mother.education.complete",
               "father.exatec", "mother.exatec", "physical.education", "total.life.activities"]:
         df[c] = "No information"
-    assert all(c in df for g in GROUPS.values() for c in g["num"] + g["cat"])
+    online = {"admission.test.online"}  # se crea en data.clean
+    assert all(c in df for c in CANDIDATES["num"] + CANDIDATES["cat"] if c not in online)
     df.index.name = "row_id"
     return df

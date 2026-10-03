@@ -1,19 +1,16 @@
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
- & \multicolumn{3}{c}{Escenario A} & \multicolumn{3}{c}{Escenario B} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7}
-Modelo & PR-AUC & Recall & Precisión & PR-AUC & Recall & Precisión \\
+Modelo & PR-AUC & ROC-AUC & Recall & Precisión & Alertas \\
 \midrule
-Mayoría & 0{,}088\,\scriptsize$\pm$0{,}000 & 1{,}00 & 0{,}09 & 0{,}078\,\scriptsize$\pm$0{,}000 & 1{,}00 & 0{,}08 \\
-Árbol sin poda & 0{,}095\,\scriptsize$\pm$0{,}003 & 1{,}00 & 0{,}09 & 0{,}086\,\scriptsize$\pm$0{,}001 & 1{,}00 & 0{,}08 \\
+Mayoría & 0{,}078\,\scriptsize$\pm$0{,}000 & 0{,}500\,\scriptsize$\pm$0{,}000 & 1{,}00 & 0{,}08 & 1{,}00 \\
+Árbol sin poda & 0{,}091\,\scriptsize$\pm$0{,}005 & 0{,}546\,\scriptsize$\pm$0{,}011 & 1{,}00 & 0{,}08 & 1{,}00 \\
 \midrule
-Regresión logística & 0{,}192\,\scriptsize$\pm$0{,}011 & 0{,}69 & 0{,}13 & 0{,}216\,\scriptsize$\pm$0{,}017 & 0{,}65 & 0{,}13 \\
-Random Forest & 0{,}162\,\scriptsize$\pm$0{,}004 & 0{,}73 & 0{,}12 & 0{,}179\,\scriptsize$\pm$0{,}006 & 0{,}62 & 0{,}13 \\
-SVM (kernel RBF) & 0{,}191\,\scriptsize$\pm$0{,}012 & 0{,}72 & 0{,}13 & 0{,}216\,\scriptsize$\pm$0{,}021 & 0{,}67 & 0{,}13 \\
-Gradient Boosting & 0{,}185\,\scriptsize$\pm$0{,}010 & 0{,}77 & 0{,}12 & 0{,}228\,\scriptsize$\pm$0{,}029 & 0{,}75 & 0{,}11 \\
-XGBoost & 0{,}182\,\scriptsize$\pm$0{,}010 & 0{,}79 & 0{,}12 & 0{,}224\,\scriptsize$\pm$0{,}026 & 0{,}72 & 0{,}12 \\
-LightGBM & 0{,}187\,\scriptsize$\pm$0{,}010 & 0{,}76 & 0{,}12 & \textbf{0{,}233\,\scriptsize$\pm$0{,}028} & 0{,}73 & 0{,}12 \\
-CatBoost & 0{,}186\,\scriptsize$\pm$0{,}009 & 0{,}75 & 0{,}12 & 0{,}228\,\scriptsize$\pm$0{,}024 & 0{,}67 & 0{,}13 \\
-CatBoost nativo$^{\dagger}$ & \textbf{0{,}199\,\scriptsize$\pm$0{,}010} & 0{,}70 & 0{,}14 & 0{,}230\,\scriptsize$\pm$0{,}023 & 0{,}68 & 0{,}13 \\
+Regresión logística & 0{,}224\,\scriptsize$\pm$0{,}019 & 0{,}715\,\scriptsize$\pm$0{,}010 & 0{,}64 & 0{,}14 & 0{,}36 \\
+Random Forest & 0{,}230\,\scriptsize$\pm$0{,}018 & 0{,}697\,\scriptsize$\pm$0{,}012 & 0{,}58 & 0{,}14 & 0{,}33 \\
+SVM (kernel RBF) & 0{,}235\,\scriptsize$\pm$0{,}017 & 0{,}716\,\scriptsize$\pm$0{,}007 & 0{,}63 & 0{,}14 & 0{,}36 \\
+Gradient Boosting & 0{,}245\,\scriptsize$\pm$0{,}022 & 0{,}716\,\scriptsize$\pm$0{,}007 & 0{,}68 & 0{,}13 & 0{,}40 \\
+XGBoost & 0{,}248\,\scriptsize$\pm$0{,}021 & 0{,}717\,\scriptsize$\pm$0{,}009 & 0{,}60 & 0{,}14 & 0{,}33 \\
+LightGBM & 0{,}247\,\scriptsize$\pm$0{,}023 & 0{,}716\,\scriptsize$\pm$0{,}005 & 0{,}67 & 0{,}13 & 0{,}40 \\
+CatBoost & \textbf{0{,}248\,\scriptsize$\pm$0{,}023} & 0{,}711\,\scriptsize$\pm$0{,}009 & 0{,}66 & 0{,}13 & 0{,}39 \\
 \bottomrule
 \end{tabular}

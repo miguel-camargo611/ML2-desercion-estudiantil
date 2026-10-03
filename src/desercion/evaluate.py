@@ -4,7 +4,7 @@ Esquema por modelo (sin fuga de información):
 
     pliegue externo k (StratifiedGroupKFold, 5)
       ├─ entrenamiento_k ──► GridSearchCV (StratifiedGroupKFold interno, 3; métrica PR-AUC)
-      │                       └─ Pipeline: imputar/escalar/one-hot ► SMOTE ► clasificador
+      │                       └─ Pipeline: imputar/escalar/one-hot ► (SMOTE) ► clasificador
       │                  ──► umbral: predicciones fuera de pliegue (3) dentro de entrenamiento_k,
       │                       se elige el que maximiza F2
       └─ validación_k   ──► solo predict: métricas con el umbral ya fijado
@@ -33,7 +33,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV, StratifiedGroupKFold, cross_val_predict
 
 from desercion import config
-from desercion.models import ModelSpec, build_pipeline
+from desercion.models import ModelSpec, build_pipeline, params_to_text
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def nested_cv(spec: ModelSpec, X: pd.DataFrame, y: pd.Series, groups: pd.Series,
         fold_rows.append({
             "modelo": spec.name, "familia": spec.family, "pliegue": k, **m,
             "recall_umbral_def": m_default["recall"], "f1_ponderado_umbral_def": m_default["f1_ponderado"],
-            "umbral": thr, "params": str(params), "segundos": time.perf_counter() - t0,
+            "umbral": thr, "params": params_to_text(params), "segundos": time.perf_counter() - t0,
         })
         oof_rows.append(pd.DataFrame({"row_id": X_va.index, "pliegue": k, "y": y_va,
                                       "score": s_va, "pred": pred, "modelo": spec.name}))

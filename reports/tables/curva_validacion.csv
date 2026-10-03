@@ -1,0 +1,121 @@
+modelo,parametro,valor,pliegue,parte,pr_auc
+LightGBM,clf__num_leaves,2.0,0,entrenamiento,0.23880241707928573
+LightGBM,clf__num_leaves,2.0,0,validación,0.23579280018117477
+LightGBM,clf__num_leaves,2.0,1,entrenamiento,0.23752270355611413
+LightGBM,clf__num_leaves,2.0,1,validación,0.22454198977437317
+LightGBM,clf__num_leaves,2.0,2,entrenamiento,0.24311168667372365
+LightGBM,clf__num_leaves,2.0,2,validación,0.19703562137549224
+LightGBM,clf__num_leaves,2.0,3,entrenamiento,0.2364869540146228
+LightGBM,clf__num_leaves,2.0,3,validación,0.21631413455910417
+LightGBM,clf__num_leaves,2.0,4,entrenamiento,0.22494338049356166
+LightGBM,clf__num_leaves,2.0,4,validación,0.24887455470639444
+LightGBM,clf__num_leaves,4.0,0,entrenamiento,0.28503406390385005
+LightGBM,clf__num_leaves,4.0,0,validación,0.24621978236094166
+LightGBM,clf__num_leaves,4.0,1,entrenamiento,0.28858005304136064
+LightGBM,clf__num_leaves,4.0,1,validación,0.2444444554866253
+LightGBM,clf__num_leaves,4.0,2,entrenamiento,0.28820829309245505
+LightGBM,clf__num_leaves,4.0,2,validación,0.22649042029853084
+LightGBM,clf__num_leaves,4.0,3,entrenamiento,0.28593202305885895
+LightGBM,clf__num_leaves,4.0,3,validación,0.23632653460279318
+LightGBM,clf__num_leaves,4.0,4,entrenamiento,0.27530949074071054
+LightGBM,clf__num_leaves,4.0,4,validación,0.2853528142144374
+LightGBM,clf__num_leaves,8.0,0,entrenamiento,0.33773249980309544
+LightGBM,clf__num_leaves,8.0,0,validación,0.24064984367332665
+LightGBM,clf__num_leaves,8.0,1,entrenamiento,0.3380140935307109
+LightGBM,clf__num_leaves,8.0,1,validación,0.24610460607911822
+LightGBM,clf__num_leaves,8.0,2,entrenamiento,0.3349745818555122
+LightGBM,clf__num_leaves,8.0,2,validación,0.23942701932984076
+LightGBM,clf__num_leaves,8.0,3,entrenamiento,0.3358296900869325
+LightGBM,clf__num_leaves,8.0,3,validación,0.2446457738507598
+LightGBM,clf__num_leaves,8.0,4,entrenamiento,0.32825557193763377
+LightGBM,clf__num_leaves,8.0,4,validación,0.2816640363193264
+LightGBM,clf__num_leaves,16.0,0,entrenamiento,0.43125588950236576
+LightGBM,clf__num_leaves,16.0,0,validación,0.23462509150739808
+LightGBM,clf__num_leaves,16.0,1,entrenamiento,0.4233606139238781
+LightGBM,clf__num_leaves,16.0,1,validación,0.23744636332479055
+LightGBM,clf__num_leaves,16.0,2,entrenamiento,0.4178719015265131
+LightGBM,clf__num_leaves,16.0,2,validación,0.23967151488879584
+LightGBM,clf__num_leaves,16.0,3,entrenamiento,0.42253638705928315
+LightGBM,clf__num_leaves,16.0,3,validación,0.24685594876262718
+LightGBM,clf__num_leaves,16.0,4,entrenamiento,0.4143903448692084
+LightGBM,clf__num_leaves,16.0,4,validación,0.2729784565147102
+LightGBM,clf__num_leaves,32.0,0,entrenamiento,0.5940325831783828
+LightGBM,clf__num_leaves,32.0,0,validación,0.22962699245364787
+LightGBM,clf__num_leaves,32.0,1,entrenamiento,0.5818309616138995
+LightGBM,clf__num_leaves,32.0,1,validación,0.23307805358539127
+LightGBM,clf__num_leaves,32.0,2,entrenamiento,0.5799955301316038
+LightGBM,clf__num_leaves,32.0,2,validación,0.23221307547975895
+LightGBM,clf__num_leaves,32.0,3,entrenamiento,0.5781057814368582
+LightGBM,clf__num_leaves,32.0,3,validación,0.2361603680539543
+LightGBM,clf__num_leaves,32.0,4,entrenamiento,0.577543559018333
+LightGBM,clf__num_leaves,32.0,4,validación,0.25878125897595006
+LightGBM,clf__num_leaves,64.0,0,entrenamiento,0.8364915017670005
+LightGBM,clf__num_leaves,64.0,0,validación,0.2241093548512289
+LightGBM,clf__num_leaves,64.0,1,entrenamiento,0.8240633292270373
+LightGBM,clf__num_leaves,64.0,1,validación,0.22587781226948156
+LightGBM,clf__num_leaves,64.0,2,entrenamiento,0.8228225829773264
+LightGBM,clf__num_leaves,64.0,2,validación,0.231022619490187
+LightGBM,clf__num_leaves,64.0,3,entrenamiento,0.8250854518323099
+LightGBM,clf__num_leaves,64.0,3,validación,0.23241470630530173
+LightGBM,clf__num_leaves,64.0,4,entrenamiento,0.8222586618528052
+LightGBM,clf__num_leaves,64.0,4,validación,0.24638773096023944
+LightGBM,clf__num_leaves,128.0,0,entrenamiento,0.9183304192741838
+LightGBM,clf__num_leaves,128.0,0,validación,0.21310284083480865
+LightGBM,clf__num_leaves,128.0,1,entrenamiento,0.911936407357306
+LightGBM,clf__num_leaves,128.0,1,validación,0.22201411437604832
+LightGBM,clf__num_leaves,128.0,2,entrenamiento,0.9080073860261386
+LightGBM,clf__num_leaves,128.0,2,validación,0.22522633330910605
+LightGBM,clf__num_leaves,128.0,3,entrenamiento,0.9086593761215125
+LightGBM,clf__num_leaves,128.0,3,validación,0.22942629318424743
+LightGBM,clf__num_leaves,128.0,4,entrenamiento,0.9084810232567591
+LightGBM,clf__num_leaves,128.0,4,validación,0.24205910435446532
+SVM (RBF-Nystroem),clf__svm__C,0.0001,0,entrenamiento,0.17713347044758265
+SVM (RBF-Nystroem),clf__svm__C,0.0001,0,validación,0.1795169781208802
+SVM (RBF-Nystroem),clf__svm__C,0.0001,1,entrenamiento,0.17610656077652248
+SVM (RBF-Nystroem),clf__svm__C,0.0001,1,validación,0.18957322270319998
+SVM (RBF-Nystroem),clf__svm__C,0.0001,2,entrenamiento,0.18136642408959744
+SVM (RBF-Nystroem),clf__svm__C,0.0001,2,validación,0.16303681304487305
+SVM (RBF-Nystroem),clf__svm__C,0.0001,3,entrenamiento,0.1787117596337948
+SVM (RBF-Nystroem),clf__svm__C,0.0001,3,validación,0.1802080842690713
+SVM (RBF-Nystroem),clf__svm__C,0.0001,4,entrenamiento,0.174996766692746
+SVM (RBF-Nystroem),clf__svm__C,0.0001,4,validación,0.18856262898210113
+SVM (RBF-Nystroem),clf__svm__C,0.001,0,entrenamiento,0.21595185039877912
+SVM (RBF-Nystroem),clf__svm__C,0.001,0,validación,0.21016920969224517
+SVM (RBF-Nystroem),clf__svm__C,0.001,1,entrenamiento,0.2113020502695708
+SVM (RBF-Nystroem),clf__svm__C,0.001,1,validación,0.2293656082757109
+SVM (RBF-Nystroem),clf__svm__C,0.001,2,entrenamiento,0.21889632531836506
+SVM (RBF-Nystroem),clf__svm__C,0.001,2,validación,0.19383725770112478
+SVM (RBF-Nystroem),clf__svm__C,0.001,3,entrenamiento,0.21629690810813487
+SVM (RBF-Nystroem),clf__svm__C,0.001,3,validación,0.21218252189023773
+SVM (RBF-Nystroem),clf__svm__C,0.001,4,entrenamiento,0.2097263365109332
+SVM (RBF-Nystroem),clf__svm__C,0.001,4,validación,0.22478069921420107
+SVM (RBF-Nystroem),clf__svm__C,0.01,0,entrenamiento,0.23545713794243894
+SVM (RBF-Nystroem),clf__svm__C,0.01,0,validación,0.21548841552105372
+SVM (RBF-Nystroem),clf__svm__C,0.01,1,entrenamiento,0.23042799115336687
+SVM (RBF-Nystroem),clf__svm__C,0.01,1,validación,0.24776016214096944
+SVM (RBF-Nystroem),clf__svm__C,0.01,2,entrenamiento,0.2350690861483901
+SVM (RBF-Nystroem),clf__svm__C,0.01,2,validación,0.20600494279159737
+SVM (RBF-Nystroem),clf__svm__C,0.01,3,entrenamiento,0.23552635394453197
+SVM (RBF-Nystroem),clf__svm__C,0.01,3,validación,0.22031594547761774
+SVM (RBF-Nystroem),clf__svm__C,0.01,4,entrenamiento,0.22616229151395828
+SVM (RBF-Nystroem),clf__svm__C,0.01,4,validación,0.24965576387560073
+SVM (RBF-Nystroem),clf__svm__C,0.1,0,entrenamiento,0.25759908333895737
+SVM (RBF-Nystroem),clf__svm__C,0.1,0,validación,0.22522035648898486
+SVM (RBF-Nystroem),clf__svm__C,0.1,1,entrenamiento,0.2543773453402745
+SVM (RBF-Nystroem),clf__svm__C,0.1,1,validación,0.24241131133479987
+SVM (RBF-Nystroem),clf__svm__C,0.1,2,entrenamiento,0.25498549354453964
+SVM (RBF-Nystroem),clf__svm__C,0.1,2,validación,0.21885775494771748
+SVM (RBF-Nystroem),clf__svm__C,0.1,3,entrenamiento,0.2561668113151225
+SVM (RBF-Nystroem),clf__svm__C,0.1,3,validación,0.2273679484797652
+SVM (RBF-Nystroem),clf__svm__C,0.1,4,entrenamiento,0.24889746085539716
+SVM (RBF-Nystroem),clf__svm__C,0.1,4,validación,0.260853478510305
+SVM (RBF-Nystroem),clf__svm__C,1.0,0,entrenamiento,0.28502120096824385
+SVM (RBF-Nystroem),clf__svm__C,1.0,0,validación,0.22120571509531417
+SVM (RBF-Nystroem),clf__svm__C,1.0,1,entrenamiento,0.2808276932524581
+SVM (RBF-Nystroem),clf__svm__C,1.0,1,validación,0.2343011014148732
+SVM (RBF-Nystroem),clf__svm__C,1.0,2,entrenamiento,0.2809175168643831
+SVM (RBF-Nystroem),clf__svm__C,1.0,2,validación,0.21667925533943266
+SVM (RBF-Nystroem),clf__svm__C,1.0,3,entrenamiento,0.28332662848734
+SVM (RBF-Nystroem),clf__svm__C,1.0,3,validación,0.22842088539093786
+SVM (RBF-Nystroem),clf__svm__C,1.0,4,entrenamiento,0.27672955530181464
+SVM (RBF-Nystroem),clf__svm__C,1.0,4,validación,0.2594692065249282

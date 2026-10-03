@@ -2,21 +2,21 @@
 seed: 42
 
 paths:
-  raw_data: "data/raw/2022-03-16 dataset on student dropout .xlsx"
+  raw_dir: data/raw                   # aquí va el Excel del TEC DataHub (cualquier nombre .xlsx)
   interim_data: data/interim/students.parquet
   split: data/processed/split.parquet
   processed_dir: data/processed
-  models_dir: models
   figures_dir: reports/figures
   tables_dir: reports/tables
-  report_figures_dir: Segunda_entrega/figuras
 
 # Población de estudio: solo pregrado (educación superior, como en el artículo base).
 population:
   level: Undergraduate
 
-# Escenario B: cohortes que tienen desempeño del primer periodo (AD19, AD20).
-first_period_generations: [AD19, AD20]
+# Población de estudio: cohortes que registran el desempeño del primer semestre. La partición
+# desarrollo/prueba se hizo sobre todo el pregrado (AD14–AD20) y no se recalcula, para no tocar
+# el conjunto de prueba sellado.
+study_generations: [AD19, AD20]
 
 split:
   test_size: 0.20          # conjunto de prueba sellado hasta la Entrega final

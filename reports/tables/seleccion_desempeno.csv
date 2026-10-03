@@ -1,0 +1,21 @@
+conjunto,modelo,pliegue,n_variables,pr_auc
+Todas las candidatas,LightGBM,0,28,0.22798641376889106
+Todas las candidatas,Regresión logística,0,28,0.22901677114508914
+Seleccionadas,LightGBM,0,22,0.21891798764815532
+Seleccionadas,Regresión logística,0,22,0.22866431298739576
+Todas las candidatas,LightGBM,1,28,0.2414958805180321
+Todas las candidatas,Regresión logística,1,28,0.21440238169110062
+Seleccionadas,LightGBM,1,25,0.24049336046574957
+Seleccionadas,Regresión logística,1,25,0.2127137005057686
+Todas las candidatas,LightGBM,2,28,0.22979996539595665
+Todas las candidatas,Regresión logística,2,28,0.2049680691830458
+Seleccionadas,LightGBM,2,21,0.22788048453812776
+Seleccionadas,Regresión logística,2,21,0.20635825164159796
+Todas las candidatas,LightGBM,3,28,0.24392477506029392
+Todas las candidatas,Regresión logística,3,28,0.21980801734503136
+Seleccionadas,LightGBM,3,21,0.22974903765423932
+Seleccionadas,Regresión logística,3,21,0.2198420211281818
+Todas las candidatas,LightGBM,4,28,0.2726420051058747
+Todas las candidatas,Regresión logística,4,28,0.25372757025429094
+Seleccionadas,LightGBM,4,21,0.26475270963233194
+Seleccionadas,Regresión logística,4,21,0.2539106571784107

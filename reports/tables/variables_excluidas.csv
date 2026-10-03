@@ -4,12 +4,17 @@ dropout.semester,Derivada del objetivo: solo es > 0 si el estudiante desertó (f
 student.id,Identificador; se usa solo para agrupar la partición.
 generation,Identifica la cohorte; una cohorte nueva no existiría en entrenamiento.
 level,Constante tras filtrar pregrado.
+educational.model,Constante en AD19–AD20 (todos los estudiantes cursan el mismo modelo).
+socioeconomic.level,"No utilizable: falta en el 55 % de AD19–AD20 porque no se registró para todos los estudiantes, y la tasa de deserción es igual con y sin dato."
+social.lag,No utilizable: falta en el 44 % de AD19–AD20 (mismo motivo que el nivel socioeconómico) y no se asocia con la deserción.
+total.scholarship.loan,Redundante: es la suma de % de beca y % de crédito (VIF de 10^7).
+online.test,"Redundante: indica si el examen de admisión se presentó en línea, lo que ya codifica la variable admission.test.online."
 id.school.origin,6.534 niveles; su información se resume en school.cost y tec.no.tec.
 father.education.complete,Redundante con father.education.summary.
 mother.education.complete,Redundante con mother.education.summary.
 father.exatec,Redundante con parents.exatec.
 mother.exatec,Redundante con parents.exatec.
-physical.education,Actividad co-curricular del periodo: ambigüedad temporal y 'No information' concentra desertores (marcador de fuga).
+physical.education,Actividad co-curricular medida durante el año: refleja la permanencia en lugar de anticiparla.
 cultural.diffusion,Ídem actividades co-curriculares.
 student.society,Ídem actividades co-curriculares.
 total.life.activities,Ídem actividades co-curriculares.

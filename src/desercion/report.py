@@ -8,67 +8,75 @@ from pathlib import Path
 import pandas as pd
 
 ORDER = ["Mayoría", "Árbol sin poda", "Regresión logística", "Random Forest",
-         "SVM (RBF-Nystroem)", "Gradient Boosting", "XGBoost", "LightGBM", "CatBoost",
-         "CatBoost nativo"]
-LABELS = {"CatBoost nativo": "CatBoost nativo$^{\\dagger}$", "SVM (RBF-Nystroem)": "SVM (kernel RBF)"}
+         "SVM (RBF-Nystroem)", "Gradient Boosting", "XGBoost", "LightGBM", "CatBoost"]
+LABELS = {"SVM (RBF-Nystroem)": "SVM (kernel RBF)"}
 
 # Nombre legible de cada hiperparámetro de las rejillas.
 PARAM_NAMES = {
     "clf__C": "$C$",
-    "clf__max_depth": "profundidad máx.",
     "clf__min_samples_leaf": "mín. registros por hoja",
-    "clf__kernel__gamma": "$\\gamma$",
+    "clf__max_features": "variables por división",
+    "clf__kernel__gamma": r"$\gamma$",
     "clf__svm__C": "$C$",
     "clf__learning_rate": "tasa de aprendizaje",
     "clf__max_leaf_nodes": "máx. hojas",
+    "clf__l2_regularization": "regularización L2",
+    "clf__max_depth": "profundidad máx.",
+    "clf__min_child_weight": "peso mín. por hoja",
     "clf__num_leaves": "hojas",
+    "clf__min_child_samples": "mín. registros por hoja",
     "clf__depth": "profundidad",
+    "clf__l2_leaf_reg": "regularización L2",
+    "clf__class_weights": "pesos de clase",
+    "sampler": "balanceo",
 }
 
 
 def _dec(v) -> str:
-    if v is None:
-        return "sin límite"
+    """Valor de un hiperparámetro en texto (los objetos de balanceo, por su nombre)."""
+    if v is None or v in ("passthrough", "none"):
+        return "ninguno"
+    if isinstance(v, str):
+        return {"Balanced": "balanceados", "sqrt": r"$\sqrt{p}$"}.get(v, v)
+    if not isinstance(v, (int, float)):
+        return type(v).__name__
     return f"{v:g}".replace(".", "{,}")
 
 
 def _fmt(mean: float, sd: float | None = None, d: int = 3) -> str:
     txt = f"{mean:.{d}f}".replace(".", "{,}")
     if sd is not None:
-        txt += f"\\,\\scriptsize$\\pm${sd:.{d}f}".replace(".", "{,}")
+        txt += rf"\,\scriptsize$\pm${sd:.{d}f}".replace(".", "{,}")
     return txt
 
 
-def results_table(summaries: dict[str, pd.DataFrame], path: Path) -> Path:
-    """PR-AUC (media ± desviación), recall y precisión por modelo y escenario."""
-    metrics = [("pr_auc", True), ("recall", False), ("precision", False)]
-    best = {s: summaries[s]["pr_auc_mean"].drop(["Mayoría", "Árbol sin poda"], errors="ignore").max()
-            for s in summaries}
+def _tabular(spec: str, header: str, lines: list[str]) -> str:
+    return ("\\begin{tabular}{" + spec + "}\n\\toprule\n" + header + " \\\\\n\\midrule\n"
+            + "\n".join(lines) + "\n\\bottomrule\n\\end{tabular}\n")
+
+
+def results_table(summary: pd.DataFrame, path: Path) -> Path:
+    """PR-AUC y ROC-AUC (media ± desviación), recall, precisión y tasa de alerta por modelo."""
+    best = summary["pr_auc_mean"].drop(["Mayoría", "Árbol sin poda"], errors="ignore").max()
     lines = []
     for model in ORDER:
-        cells = [LABELS.get(model, model)]
-        for s, summ in summaries.items():
-            for m, with_sd in metrics:
-                v = summ.loc[model, f"{m}_mean"]
-                cell = _fmt(v, summ.loc[model, f"{m}_std"] if with_sd else None, 2 if m != "pr_auc" else 3)
-                if m == "pr_auc" and abs(v - best[s]) < 1e-12:
-                    cell = f"\\textbf{{{cell}}}"
-                cells.append(cell)
+        r = summary.loc[model]
+        pr = _fmt(r["pr_auc_mean"], r["pr_auc_std"])
+        if abs(r["pr_auc_mean"] - best) < 1e-12:
+            pr = f"\\textbf{{{pr}}}"
+        cells = [LABELS.get(model, model), pr, _fmt(r["roc_auc_mean"], r["roc_auc_std"]),
+                 _fmt(r["recall_mean"], d=2), _fmt(r["precision_mean"], d=2),
+                 _fmt(r["tasa_alerta_mean"], d=2)]
         lines.append(" & ".join(cells) + " \\\\")
         if model == "Árbol sin poda":
             lines.append("\\midrule")
-    k = len(metrics)
-    head = " & ".join(["Modelo"] + ["PR-AUC", "Recall", "Precisión"] * len(summaries))
-    groups = " & ".join([""] + [f"\\multicolumn{{{k}}}{{c}}{{Escenario {s}}}" for s in summaries])
-    cmid = " ".join(f"\\cmidrule(lr){{{2 + k * i}-{1 + k * (i + 1)}}}" for i in range(len(summaries)))
-    tex = (f"\\begin{{tabular}}{{l{'rrr' * len(summaries)}}}\n\\toprule\n{groups} \\\\\n{cmid}\n"
-           f"{head} \\\\\n\\midrule\n" + "\n".join(lines) + "\n\\bottomrule\n\\end{tabular}\n")
-    path.write_text(tex, encoding="utf-8")
+    header = "Modelo & PR-AUC & ROC-AUC & Recall & Precisión & Alertas"
+    path.write_text(_tabular("lrrrrr", header, lines), encoding="utf-8")
     return path
 
 
-def hyperparams_table(folds: dict[str, pd.DataFrame], grids: dict[str, dict], path: Path) -> Path:
-    """Rejilla explorada y valor elegido con más frecuencia en los pliegues externos."""
+def hyperparams_table(folds: pd.DataFrame, grids: dict[str, dict], path: Path) -> Path:
+    """Rejilla explorada y combinación elegida con más frecuencia en los pliegues externos."""
     lines = []
     for model in ORDER:
         grid = grids.get(model)
@@ -76,16 +84,16 @@ def hyperparams_table(folds: dict[str, pd.DataFrame], grids: dict[str, dict], pa
             continue
         explored = "; ".join(f"{PARAM_NAMES[p]}: {', '.join(_dec(v) for v in vals)}"
                              for p, vals in grid.items())
-        chosen = []
-        for f in folds.values():
-            mode = ast.literal_eval(f.loc[f.modelo == model, "params"].mode().iloc[0])
-            chosen.append(", ".join(_dec(mode[p]) for p in grid))
-        lines.append(" & ".join([LABELS.get(model, model), explored, *chosen]) + " \\\\")
-    cols = " & ".join(["Modelo", "Valores explorados"] + [f"Elegido {s}" for s in folds])
-    tex = ("\\begin{tabular}{>{\\raggedright\\arraybackslash}p{2.9cm}"
-           ">{\\raggedright\\arraybackslash}p{7.3cm}" + "c" * len(folds) + "}\n\\toprule\n"
-           f"{cols} \\\\\n\\midrule\n" + "\n".join(lines) + "\n\\bottomrule\n\\end{tabular}\n")
-    path.write_text(tex, encoding="utf-8")
+        params = folds.loc[folds.modelo == model, "params"]
+        top = params.mode().iloc[0]
+        mode = ast.literal_eval(top)
+        chosen = ", ".join(_dec(mode[p]) for p in grid)
+        n = int((params == top).sum())
+        lines.append(f"{LABELS.get(model, model)} & {explored} & {chosen} ({n}/5) \\\\")
+    spec = (r">{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{8.2cm}"
+            r">{\raggedright\arraybackslash}p{3.6cm}")
+    header = "Modelo & Valores explorados & Elegido (rondas)"
+    path.write_text(_tabular(spec, header, lines), encoding="utf-8")
     return path
 
 
@@ -96,8 +104,22 @@ def leakage_table(demo: pd.DataFrame, path: Path) -> Path:
              "Pipeline (SMOTE dentro del pliegue)": "SMOTE solo en entrenamiento (este trabajo)"}
     lines = [f"{names[p]} & {_fmt(r['f1_Deserción'], d=2)} & {_fmt(r['pr_auc'], d=2)} \\\\"
              for p, r in g.loc[list(names)].iterrows()]
-    tex = ("\\begin{tabular}{lcc}\n\\toprule\n"
-           "Protocolo & F1 deserción (umbral 0,5) & PR-AUC \\\\\n\\midrule\n"
-           + "\n".join(lines) + "\n\\bottomrule\n\\end{tabular}\n")
-    path.write_text(tex, encoding="utf-8")
+    header = "Protocolo & F1 deserción (umbral 0,5) & PR-AUC"
+    path.write_text(_tabular("lcc", header, lines), encoding="utf-8")
+    return path
+
+
+def cost_table(cost: pd.DataFrame, summary: pd.DataFrame, path: Path) -> Path:
+    """Costo computacional frente a desempeño, por modelo."""
+    c = cost.set_index("modelo")
+    lines = []
+    for model in ORDER:
+        r = c.loc[model]
+        lines.append(" & ".join([
+            LABELS.get(model, model), _fmt(summary.loc[model, "pr_auc_mean"]),
+            str(int(r["combinaciones"])), _fmt(r["busqueda_min"], d=1), _fmt(r["ajuste_s"], d=2),
+            _fmt(r["prediccion_ms_por_1000"], d=1), _fmt(r["tamano_mb"], d=2)]) + " \\\\")
+    header = ("Modelo & PR-AUC & Combinaciones & Búsqueda (min) & Ajuste (s) & "
+              "Predicción (ms/1.000) & Tamaño (MB)")
+    path.write_text(_tabular("lrrrrrr", header, lines), encoding="utf-8")
     return path

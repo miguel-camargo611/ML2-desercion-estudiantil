@@ -4,33 +4,48 @@ from imblearn.over_sampling import SMOTE
 
 from desercion import data
 from desercion.evaluate import best_threshold, compare_models
-from desercion.features import feature_lists, make_preprocessor
-from desercion.models import build_pipeline, get_specs
+from desercion.features import add_engineered, feature_lists, make_preprocessor
+from desercion.models import (
+    build_pipeline,
+    get_specs,
+    params_from_text,
+    params_to_text,
+    tuned_pipeline,
+)
 
 
 @pytest.fixture(scope="module")
 def xy(raw_like):
-    df = data.add_targets(data.clean(raw_like))
-    num, cat = feature_lists("B")
+    df = add_engineered(data.add_targets(data.clean(raw_like)))
+    num, cat = feature_lists()
     return df[num + cat], df[data.TARGET], num, cat
 
 
-@pytest.mark.parametrize("name", ["Mayoría", "Árbol sin poda", "LightGBM", "CatBoost nativo",
-                                  "SVM (RBF-Nystroem)"])
-def test_pipelines_fit_and_score(xy, name):
+@pytest.mark.parametrize("name", list(get_specs()))
+def test_every_model_fits_with_its_first_grid_point(xy, name):
     X, y, num, cat = xy
     spec = get_specs()[name]
-    pipe = build_pipeline(spec, num, cat).fit(X, y)
-    pred = pipe.predict(X)
-    assert len(pred) == len(X)
+    first = {k: v[0] for k, v in spec.grid.items()}
+    pipe = build_pipeline(spec, num, cat).set_params(**first).fit(X, y)
+    assert len(pipe.predict(X)) == len(X)
 
 
 def test_smote_only_resamples_during_fit(xy):
     """El Pipeline de imblearn no debe cambiar el número de filas al predecir."""
     X, y, num, cat = xy
-    pipe = build_pipeline(get_specs()["LightGBM"], num, cat).fit(X, y)
+    spec = get_specs()["LightGBM"]
+    pipe = build_pipeline(spec, num, cat, sampler=SMOTE(random_state=0)).fit(X, y)
     assert isinstance(pipe.named_steps["sampler"], SMOTE)
     assert pipe.predict_proba(X).shape[0] == len(X)
+
+
+def test_params_round_trip(xy):
+    X, y, num, cat = xy
+    params = {"clf__num_leaves": 8, "sampler": SMOTE(random_state=0)}
+    back = params_from_text(params_to_text(params))
+    assert back["clf__num_leaves"] == 8 and isinstance(back["sampler"], SMOTE)
+    pipe = tuned_pipeline(get_specs()["LightGBM"], back, num, cat).fit(X, y)
+    assert pipe.named_steps["clf"].num_leaves == 8
 
 
 def test_preprocessor_learns_only_from_fit_data(xy):
@@ -66,3 +81,36 @@ def test_original_variable_mapping():
     assert original_variable("school_EIC", originals) == "school"
     assert original_variable("missingindicator_PNA", originals) == "PNA"
     assert original_variable("program_infrequent_sklearn", originals) == "program"
+
+
+def test_scaler_learns_only_from_training_rows(xy):
+    """El escalamiento se ajusta con el entrenamiento del pliegue y se aplica tal cual a validación."""
+    X, y, num, cat = xy
+    half = len(X) // 2
+    pipe = build_pipeline(get_specs()["Regresión logística"], num, cat).fit(X.iloc[:half],
+                                                                          y.iloc[:half])
+    num_pipe = pipe.named_steps["prep"].named_transformers_["num"]
+    imputed = num_pipe.named_steps["imputar"].transform(X.iloc[:half][num])
+    scaler = num_pipe.named_steps["escalar"]
+    assert np.allclose(scaler.mean_, imputed.mean(axis=0))
+    # Los datos no vistos se transforman con la media del entrenamiento, no con la suya propia.
+    other = num_pipe.transform(X.iloc[half:][num])
+    assert not np.allclose(other.mean(axis=0), 0)
+
+
+def test_cost_and_validation_curve_run(raw_like):
+    import pandas as pd
+
+    from desercion import experiments
+    from desercion.models import params_to_text
+
+    df = add_engineered(data.add_targets(data.clean(raw_like)))
+    specs = {k: v for k, v in get_specs().items() if k in ("Mayoría", "LightGBM")}
+    folds = pd.DataFrame({"modelo": ["Mayoría", "LightGBM"], "segundos": [1.0, 2.0],
+                          "params": ["{}", params_to_text({"clf__num_leaves": 4,
+                                                           "sampler": "passthrough"})]})
+    cost = experiments.computational_cost(df, folds, specs, repeats=1)
+    assert set(cost.modelo) == set(specs) and (cost.ajuste_s > 0).all()
+    curve = experiments.validation_curve(df, specs["LightGBM"], {"clf__num_leaves": 4},
+                                         "clf__num_leaves", [2, 4])
+    assert set(curve.parte) == {"entrenamiento", "validación"} and len(curve) == 2 * 5 * 2

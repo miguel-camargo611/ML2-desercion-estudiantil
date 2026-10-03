@@ -1,107 +1,126 @@
-# Predicción de deserción estudiantil — Tec de Monterrey
+# Predicción de la deserción estudiantil — Tec de Monterrey
 
 Proyecto integrador de **Machine Learning II** (Universidad Externado de Colombia, 2026-2).
-Reproduce y adapta el método de Villar & Andrade (2024), *Supervised machine learning algorithms
+Reproduce y adapta el método de Villar y Andrade (2024), *Supervised machine learning algorithms
 for predicting student dropout and academic success: a comparative study*, sobre datos reales
 latinoamericanos: el *Student Dropout Dataset* del Tecnológico de Monterrey (Alvarado-Uribe et al., 2022).
 
 **Integrantes:** Miguel Camargo · Camilo Hernández  **Profesor:** Wilmer Pineda
 
-| Entrega | Fase | Carpeta |
+| Entrega | Fase | Informe |
 |---|---|---|
-| Primera | Comprensión del artículo y planteamiento | [`Primera_entrega/`](Primera_entrega/) |
-| Segunda | Datos, modelamiento y validación | [`Segunda_entrega/`](Segunda_entrega/) |
+| Primera | Comprensión del artículo y planteamiento | [`reports/primera_entrega/`](reports/primera_entrega/primera_entrega.pdf) |
+| Segunda | Datos, modelamiento y validación | [`reports/segunda_entrega/`](reports/segunda_entrega/segunda_entrega.pdf) |
 | Final | Consolidación, despliegue (Streamlit) y comunicación | *pendiente* |
 
-## Pregunta y diseño
+## Problema
 
-¿Qué tan bien se anticipa la deserción en el primer año de pregrado y cuánto aporta el contexto
-socioeconómico frente al desempeño académico temprano? Clasificación binaria (`desercion = 1 - retention`,
-8,8 % de positivos) en dos momentos de predicción:
+Al terminar el primer semestre, con la información de admisión y el desempeño en ese semestre,
+predecir qué estudiantes de pregrado ya no estarán matriculados al cerrar su primer año, y
+determinar qué modelo lo hace mejor. Clasificación binaria con 7,8 % de positivos, sobre las
+cohortes AD19–AD20 (24.251 estudiantes, las únicas que registran el desempeño del primer semestre).
 
-- **Escenario A — al ingreso** (cohortes AD14–AD20): solo información de admisión, como Martins et al. (2021).
-- **Escenario B — fin del primer periodo** (AD19–AD20): admisión + desempeño del primer periodo, como Villar & Andrade (2024).
+## Resultados (Segunda entrega)
 
-Se comparan árbol sin poda y clasificador de mayoría (líneas base), regresión logística, Random Forest,
-SVM con kernel RBF (aproximación de Nystroem), Gradient Boosting, XGBoost, LightGBM y CatBoost
-(con SMOTE o con categóricas nativas), con **validación cruzada anidada** (5×3) agrupada por estudiante,
-SMOTE dentro del `Pipeline` y umbral de decisión calibrado para priorizar el *recall* (F2).
+Validación cruzada anidada (5 × 3) en el conjunto de desarrollo; el 20 % de prueba sigue sellado.
 
-## Resultados principales (Segunda entrega)
+| Modelo | PR-AUC (media ± DE) | ROC-AUC | Ajuste del modelo final |
+|---|---|---|---|
+| **CatBoost** | **0,248 ± 0,023** | 0,711 | 16,0 s |
+| XGBoost | 0,248 ± 0,021 | 0,717 | 1,0 s |
+| LightGBM | 0,247 ± 0,023 | 0,716 | 0,5 s |
+| Gradient Boosting | 0,245 ± 0,022 | 0,716 | 1,2 s |
+| SVM (kernel RBF) | 0,235 ± 0,017 | 0,716 | 2,4 s |
+| Random Forest | 0,230 ± 0,018 | 0,697 | 4,6 s |
+| Regresión logística | 0,224 ± 0,019 | 0,715 | 0,3 s |
+| Árbol sin poda (línea base) | 0,091 ± 0,005 | 0,546 | 0,4 s |
+| Clasificador de mayoría (línea base) | 0,078 | 0,500 | 0,2 s |
 
-| | Escenario A (ingreso) | Escenario B (1.er periodo) |
+El PR-AUC de un modelo al azar es 0,078 (la proporción de desertores). Alertando al 20 % de
+estudiantes con mayor riesgo, CatBoost detecta al 46 % de los desertores.
+
+- **La familia de *boosting* empata** (prueba t corregida de Nadeau-Bengio, *p* > 0,4) y CatBoost
+  supera por poco, pero de forma significativa, a la regresión logística (*p* = 0,026). La señal es débil
+  (ROC-AUC ≈ 0,72). Con desempeños empatados, el costo computacional sirve de desempate.
+- **SMOTE no ayuda:** al tratarlo como hiperparámetro, la validación lo rechazó en las 30 elecciones
+  (6 modelos × 5 rondas).
+- **Fuga en el artículo:** aplicar SMOTE antes de separar los datos, como hacen Villar y Andrade,
+  sube el F1 de la clase deserción de 0,12 a 0,95, lo que sugiere que parte del desempeño publicado
+  proviene del protocolo y no del modelo.
+- **El promedio del primer semestre es el mejor predictor**, como en el artículo.
+
+## Cómo reproducir
+
+**1. Entorno** (Python ≥ 3.11; las versiones de las dependencias están fijadas en `pyproject.toml`):
+
+```bash
+git clone https://github.com/miguel-camargo611/ML2-desercion-estudiantil.git
+cd ML2-desercion-estudiantil
+python -m venv .venv
+.venv\Scripts\activate          # Windows   ·   Linux/macOS: source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+**2. Datos.** Los datos no se incluyen: su uso está sujeto a los términos del TEC DataHub.
+Solicite el *Student Dropout Dataset* ([doi:10.57687/FK2/PWJRSJ](https://doi.org/10.57687/FK2/PWJRSJ))
+y copie el Excel recibido, **con cualquier nombre**, en `data/raw/`. Debe ser el único `.xlsx` de
+esa carpeta; si falta, el programa lo indica.
+
+**3. Flujo completo** (≈ 2 horas en un portátil de 12 hilos):
+
+```bash
+desercion all
+```
+
+o paso a paso:
+
+| Paso | Qué hace | Salidas |
 |---|---|---|
-| Prevalencia de deserción | 8,8 % | 7,8 % |
-| Mejor modelo | CatBoost nativo — PR-AUC 0,199 ± 0,010 | LightGBM — PR-AUC 0,233 ± 0,028 |
-| Regresión logística (referencia) | 0,192 | 0,216 |
-| Árbol sin poda (línea base) | 0,095 | 0,086 |
-| Desertores capturados alertando al 20 % de mayor riesgo | 42 % | 46 % |
+| `desercion prepare` | Limpieza, población de estudio y partición desarrollo/prueba | `data/processed/`, `reports/tables/calidad_datos.csv` |
+| `desercion eda` | Análisis exploratorio del conjunto de desarrollo | `reports/{tables,figures}/eda/` |
+| `desercion select` | Variables construidas y selección de variables | `reports/tables/seleccion_*.csv` |
+| `desercion train` | Validación cruzada anidada de los 9 modelos | `reports/tables/cv_*.csv` |
+| `desercion compare` | Pruebas estadísticas entre modelos | `pruebas_estadisticas.csv` |
+| `desercion experiments` | Réplicas del artículo, curvas de validación y costo computacional | `fuga_smote.csv`, `costo_computacional.csv`… |
+| `desercion interpret` | SHAP por pliegue, errores y captura por nivel de riesgo | `shap.csv`, `errores.csv`… |
+| `desercion figures` / `report` | Figuras y tablas LaTeX del informe | `reports/figures/`, `reports/tables/*.tex` |
 
-- **La señal es débil** (ROC-AUC ≈ 0,70) y el *boosting* supera por poco a un modelo lineal bien regularizado.
-- **Fuga en el artículo:** aplicar SMOTE antes de partir, como hacen Villar & Andrade, sube el F1 de las
-  clases de deserción de 0,02 a 0,76, del orden de las cifras publicadas.
-- **SMOTE no ayuda** a ordenar por riesgo (empeora el PR-AUC en A); el mejor modelo usa pesos de clase.
-- **El desempeño del primer periodo** es el mejor predictor (3 variables superan a las 28 de ingreso),
-  como en el artículo; al ingreso, ningún grupo de variables domina.
+Para una prueba rápida: `desercion train --sample 0.1`. Las pruebas automáticas (`pytest`) usan
+datos sintéticos y no requieren el dataset; corren en cada *push* (GitHub Actions).
 
-Detalle en [`Segunda_entrega/segunda_entrega.pdf`](Segunda_entrega/segunda_entrega.pdf) y en `reports/tables/`.
+**Semilla.** Todo usa la semilla `42` de `configs/config.yaml`: la partición, la validación cruzada,
+SMOTE y cada modelo reciben ese `random_state`, y la CLI fija además las semillas de Python y NumPy.
 
 ## Estructura
 
 ```
-├── configs/config.yaml        # semilla, rutas, esquema de validación, métricas
-├── data/                      # raw/ interim/ processed/ (no versionados, ver data/README.md)
-├── notebooks/                 # exploración (la lógica vive en src/)
+├── configs/config.yaml        # semilla, rutas, validación y métricas
+├── data/raw/                  # aquí va el Excel del TEC (no se versiona)
+├── notebooks/                 # EDA comentado
 ├── reports/
-│   ├── figures/               # figuras generadas por el flujo
-│   └── tables/                # resultados en CSV (métricas por pliegue, pruebas, SHAP…)
+│   ├── figures/  tables/      # resultados generados por el flujo (CSV, PNG, tablas LaTeX)
+│   └── primera_entrega/  segunda_entrega/   # informes (LaTeX y PDF)
 ├── src/desercion/
-│   ├── data.py                # carga, limpieza, objetivo, partición sellada, escenarios
-│   ├── features.py            # variables por escenario, exclusiones y preprocesamiento
-│   ├── models.py              # catálogo de modelos, rejillas y Pipeline con SMOTE
+│   ├── data.py                # carga, limpieza, objetivo, partición y población de estudio
+│   ├── eda.py                 # análisis exploratorio
+│   ├── features.py            # variables, exclusiones, variables construidas y preprocesamiento
+│   ├── models.py              # modelos, rejillas y Pipeline (preprocesamiento → balanceo → modelo)
 │   ├── evaluate.py            # CV anidada, umbral F2, métricas y pruebas estadísticas
-│   ├── experiments.py         # SMOTE vs ADASYN, fuga, Isolation Forest, ablación, multiclase, VIF
-│   ├── interpret.py           # SHAP por pliegue y análisis de errores
-│   ├── plots.py               # figuras del informe
-│   ├── report.py              # tablas LaTeX generadas desde los resultados
-│   └── cli.py                 # punto de entrada del flujo
-├── tests/                     # pruebas con datos sintéticos (corren en CI)
-├── Primera_entrega/  Segunda_entrega/   # informes (LaTeX)
-└── .github/workflows/ci.yml   # lint + pruebas en cada push
+│   ├── experiments.py         # selección, réplicas del artículo, curvas de validación y costo
+│   ├── interpret.py           # SHAP y análisis de errores
+│   ├── plots.py · report.py   # figuras y tablas del informe
+│   └── cli.py                 # punto de entrada (`desercion <paso>`)
+└── tests/                     # pruebas con datos sintéticos
 ```
 
-## Cómo reproducir
+## Uso de IA generativa
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate            # Windows  (Linux/macOS: source .venv/bin/activate)
-pip install -e ".[dev]"
-# Ubicar el Excel del TEC DataHub en data/raw/ (ver data/README.md)
-python -m desercion.cli all       # o paso a paso: prepare, train, compare, experiments, interpret, figures, report
-pytest                            # pruebas
-```
-
-La corrida completa tarda unas 3 horas en un portátil de 12 hilos (la CV anidada del escenario A es
-lo más costoso). Para una prueba rápida: `python -m desercion.cli train --scenarios B --sample 0.1`. Todo usa la semilla `42` de `configs/config.yaml`. El 20 % de los estudiantes queda
-en un **conjunto de prueba sellado** que solo se usará en la Entrega final.
-
-## Buenas prácticas adoptadas
-
-- Datos crudos inmutables y fuera de git; transformaciones en código, nunca a mano.
-- Configuración centralizada y semilla fija; dependencias declaradas en `pyproject.toml`.
-- Todo el preprocesamiento dentro de `Pipeline` (sin fuga), validado con pruebas automáticas.
-- Resultados como artefactos regenerables (`reports/`), con el comando que los produce.
-- Integración continua (ruff + pytest) y ramas/PR para cambios.
-
-## Declaración de uso de IA
-
-Se usó un asistente de IA generativa (Claude, Anthropic) como apoyo en la escritura de código y
-la revisión del texto. El equipo revisó, ejecutó y puede sustentar cada decisión técnica.
+Se usó un asistente de IA (Claude, de Anthropic) como apoyo en la escritura de código y la
+revisión del texto. El equipo revisó, ejecutó y puede sustentar cada decisión técnica.
 
 ## Referencias
 
-- Villar, A. & Robledo Velini de Andrade, C. (2024). *Discover Artificial Intelligence*, 4:2. https://doi.org/10.1007/s44163-023-00079-z
+- Villar, A. y Robledo Velini de Andrade, C. (2024). *Discover Artificial Intelligence*, 4:2. https://doi.org/10.1007/s44163-023-00079-z
 - Alvarado-Uribe, J. et al. (2022). *Data*, 7(9), 119. https://doi.org/10.3390/data7090119
-- Martins, M. V. et al. (2021). *Trends and Applications in Information Systems and Technologies*, vol. 9, 166–175.
 
-Código bajo licencia MIT (ver `LICENSE`). Los datos pertenecen al Tecnológico de Monterrey.
+Código bajo licencia MIT. Los datos pertenecen al Tecnológico de Monterrey.
