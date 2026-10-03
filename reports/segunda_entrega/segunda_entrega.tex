@@ -79,11 +79,8 @@ Camilo Hernández
 \vspace{1.2cm}
 \textbf{Profesor:} \nombreProfesor
 
-\vspace{0.8cm}
-\textbf{Código reproducible:} \repo
-
 \vspace{1.2cm}
-{\large 27 de septiembre de 2026 \par}
+{\large 2 de octubre de 2026 \par}
 \vfill
 \end{titlepage}
 
@@ -91,23 +88,23 @@ Camilo Hernández
 \setcounter{page}{1}
 
 % ================= INTRODUCCIÓN =================
-Este informe presenta la segunda fase del proyecto: la consolidación de los datos, la construcción de un flujo de modelamiento sin fuga de información, la reproducción del método de Villar y Andrade (2024) y la evaluación de los modelos. El objetivo es determinar qué modelo predice mejor si un estudiante de pregrado abandonará la universidad durante su primer año, a partir de la información disponible al terminar su primer semestre, para que la institución pueda ofrecerle acompañamiento a tiempo. El código, el análisis exploratorio completo y las instrucciones para reproducir cada resultado están en el repositorio indicado en la portada.
+Este informe corresponde a la segunda fase del proyecto: datos, modelamiento y validación. La pregunta es qué modelo predice mejor si un estudiante de pregrado dejará la universidad durante su primer año, usando lo que se sabe de él al terminar su primer semestre. Si la predicción es buena, la universidad puede ofrecer acompañamiento a tiempo a quienes más lo necesitan. El código y los pasos para repetir cada resultado se describen en el anexo.
 
 % ================= SECCIÓN 1 =================
 \section{Consolidación de los datos}
 
-\textbf{Fuente.} Se utilizó el \textit{Student Dropout Dataset} del Tecnológico de Monterrey (Alvarado-Uribe et al., 2022), obtenido mediante solicitud formal al IFE Data Hub. Contiene 143.326 registros de estudiantes de bachillerato y pregrado de siete cohortes de ingreso, de AD14 (agosto de 2014) a AD20 (agosto de 2020). Al tratarse de datos reales latinoamericanos, no fue necesario recurrir a simulación.
+\textbf{Fuente.} Se usó el \textit{Student Dropout Dataset} del Tecnológico de Monterrey (Alvarado-Uribe et al., 2022), obtenido por solicitud formal al IFE Data Hub. Tiene 143.326 registros de estudiantes de bachillerato y pregrado que ingresaron entre agosto de 2014 (cohorte AD14) y agosto de 2020 (cohorte AD20). Son datos reales latinoamericanos, así que no fue necesario simular.
 
-\textbf{Población de estudio y variable objetivo.} Villar y Andrade predicen la deserción combinando la información de ingreso con el desempeño de los primeros semestres. En este dataset, el desempeño del primer semestre (promedio, materias reprobadas y materias retiradas) solo se registró para las cohortes AD19 y AD20 (Figura~\ref{fig:faltantes}), por lo que la población de estudio son los 24.251 estudiantes de pregrado de esas dos cohortes. La predicción se hace al terminar el primer semestre, y la variable objetivo vale 1 si el estudiante ya no está matriculado al cerrar su primer año (\var{retention} $=0$). Se excluyó a los 256 estudiantes que abandonaron \emph{durante} el primer semestre: cuando se hace la predicción ya no están matriculados, y su promedio refleja el abandono en lugar de anticiparlo. El artículo distingue tres desenlaces (graduado, rezagado y desertor), pero este dataset no registra la graduación, así que el problema es de clasificación binaria. Deserta el 7,7\,\% de los estudiantes, mucho menos que en el artículo (32\,\%), lo que condiciona la elección de métricas (Sección~4).
+\textbf{Población de estudio y variable objetivo.} Villar y Andrade (2024) predicen la deserción con dos tipos de información: la que se conoce al ingresar y el desempeño en los primeros semestres. En este dataset, las notas del primer semestre (promedio, materias reprobadas y materias retiradas) solo existen para las cohortes AD19 y AD20 (Figura~\ref{fig:faltantes}). Por eso el estudio se concentra en los 24.251 estudiantes de pregrado de esas dos cohortes. La predicción se hace al terminar el primer semestre, y la variable objetivo vale 1 si el estudiante ya no está matriculado al cerrar su primer año. Se dejó por fuera a los 256 estudiantes que se retiraron a mitad del primer semestre: cuando se hace la predicción ya se fueron, y su promedio es bajo porque abandonaron, no al revés. El artículo distingue tres desenlaces (graduado, rezagado y desertor), pero este dataset no registra la graduación, así que el problema tiene dos clases: deserta o no. Solo deserta el 7,7\,\% de los estudiantes, frente al 32\,\% del artículo, y esa diferencia pesa en la elección de métricas (Sección~4).
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.72\linewidth]{eda02_faltantes_cohorte.png}
-\caption{Porcentaje de registros sin dato por variable y cohorte (pregrado, conjunto de desarrollo). Los faltantes dependen de la cohorte: el desempeño del primer semestre solo existe en AD19 y AD20.}
+\caption{Porcentaje de registros sin dato por variable y cohorte (pregrado, conjunto de desarrollo). Los faltantes dependen de la cohorte: las notas del primer semestre solo existen en AD19 y AD20.}
 \label{fig:faltantes}
 \end{figure}
 
-\textbf{Calidad de los datos.} El análisis exploratorio (notebook \var{01\us exploracion\us datos} del repositorio) identificó los problemas de la Tabla~\ref{tab:calidad}. Dos variables socioeconómicas, el nivel socioeconómico y el rezago social, \textbf{no son utilizables}: faltan para la mitad de los estudiantes porque no se registraron, la tasa de deserción es la misma con y sin dato, y cuando hay dato apenas discriminan (AUC univariada de 0,51). Imputarlas solo añadiría ruido, por lo que se excluyeron. La información familiar disponible y completa, la educación de los padres, sí se conservó.
+\textbf{Calidad de los datos.} El análisis exploratorio, disponible en el repositorio, encontró los problemas de la Tabla~\ref{tab:calidad}. El más relevante afecta a dos variables socioeconómicas, el nivel socioeconómico y el rezago social, que \textbf{no son utilizables}: falta el dato para cerca de la mitad de los estudiantes porque nunca se registró, la deserción es la misma con y sin dato, y cuando el dato existe casi no ayuda a distinguir a quienes desertan. Rellenar la mitad de una variable que no aporta solo agrega ruido, así que se excluyeron. La información familiar que sí está completa, la educación de los padres, se conservó.
 
 \begin{table}[!t]
 \centering
@@ -120,15 +117,15 @@ Problema & Magnitud & Decisión \\
 \midrule
 Nivel socioeconómico y rezago social sin dato; la deserción es igual con y sin dato & 55\,\% y 44\,\% & Se excluyen: no son utilizables. \\
 Examen de admisión con dos escalas: presencial (400--1600) y en línea (0--100) & 570 estudiantes en línea & Se separa en dos variables antes de modelar. \\
-Puntajes de admisión faltantes; quienes no los tienen desertan más & 22--32\,\% & Imputación con la mediana más una variable que indica el faltante. \\
-\% total de apoyo económico, que es la suma de beca y crédito & $\rho=0{,}96$ & Se excluye por redundante. \\
+Puntajes de admisión faltantes; quienes no los tienen desertan más & 22--32\,\% & Se rellenan con la mediana y se agrega una variable que indica que faltaban. \\
+\% total de apoyo económico, que es la suma de beca y crédito & $\rho=0{,}96$ & Se excluye por repetir información. \\
 Actividades extracurriculares medidas \emph{durante} el año & 9 variables & Se excluyen: reflejan la permanencia en lugar de anticiparla. \\
-Estudiantes que aparecen más de una vez & 6 casos & La partición se hace por estudiante, no por registro. \\
+Estudiantes que aparecen más de una vez & 6 casos & Cada estudiante queda en un solo lado de cada partición. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Variables construidas y selección.} Se construyó la \emph{brecha de promedios} (promedio del primer semestre menos promedio de bachillerato), que mide el cambio de rendimiento al llegar a la universidad: quienes bajan más de siete puntos desertan un 18\,\%, frente a un 5\,\% de quienes mantienen su nivel. Mejoró el PR-AUC de LightGBM en los cinco pliegues; una segunda variable (materias reprobadas más retiradas) no aportó y se descartó. Luego, con importancia por permutación calculada dentro de cada partición de entrenamiento, se descartaron las cinco candidatas con importancia media nula o negativa (tipo de zona, examen en línea, procedencia, colegio del Tec y primera generación); en particiones nuevas, el PR-AUC fue el mismo con y sin ellas (0,243). El modelo final usa 23 variables: 13 numéricas (promedios de bachillerato y del semestre, brecha, materias reprobadas y retiradas, examen, rúbrica y nota de matemáticas de admisión, nivel de inglés, porcentajes de beca y de crédito, edad y carga académica) y 10 categóricas (educación del padre, de la madre y máximo grado de los padres, padres exalumnos, costo del colegio, tipo de beca, escuela, programa, región y género).
+\textbf{Variables construidas y selección.} Se creó una variable nueva, la \emph{brecha de promedios}: promedio del primer semestre menos promedio de bachillerato. Indica si el estudiante bajó o subió su rendimiento al llegar a la universidad. Quienes bajan más de siete puntos desertan un 18\,\%; quienes mantienen su nivel, un 5\,\%. Esta variable mejoró a LightGBM en las cinco particiones de validación. Se probó otra (materias reprobadas más retiradas), pero no aportó y se descartó. Después se midió cuánto empeora el modelo si se desordenan al azar los valores de cada variable (importancia por permutación), siempre con los datos de entrenamiento. Cinco variables no aportaban nada (tipo de zona, examen en línea, procedencia, colegio del Tec y primera generación) y se retiraron; en particiones nuevas, el modelo obtuvo el mismo resultado sin ellas (PR-AUC de 0,243). El modelo final usa 23 variables: 13 numéricas (promedios de bachillerato y del semestre, brecha, materias reprobadas y retiradas, examen, rúbrica y nota de matemáticas de admisión, nivel de inglés, porcentajes de beca y de crédito, edad y carga académica) y 10 categóricas (educación del padre y de la madre, máximo grado de los padres, padres exalumnos, costo del colegio, tipo de beca, escuela, programa, región y género). La Tabla~\ref{tab:escenarios} resume el tamaño de los datos.
 
 \begin{table}[H]
 \centering
@@ -148,20 +145,20 @@ Prueba sellada (20\,\%) & 4.843 & 367 & 7,6\,\% & 23 \\
 % ================= SECCIÓN 2 =================
 \section{Flujo reproducible sin fuga de datos}
 
-Hay \emph{fuga de datos} cuando el modelo usa, al entrenar, información que no tendría disponible al momento de predecir. El resultado son métricas optimistas que no se sostienen en la práctica. El flujo se diseñó con tres salvaguardas.
+Para que los resultados reflejen cómo funcionaría el modelo con estudiantes nuevos, se tomaron tres precauciones.
 
-\textbf{1. Conjunto de prueba sellado.} Antes de cualquier análisis se separó el 20\,\% de los estudiantes como conjunto de prueba, que no se ha usado ni siquiera en el análisis exploratorio y solo se usará en la entrega final. La separación conserva la proporción de desertores y de cohortes, y asigna cada estudiante a un solo lado.
+\textbf{1. Conjunto de prueba sellado.} Antes de cualquier análisis se apartó el 20\,\% de los estudiantes. Ese grupo no se ha mirado, ni siquiera en el análisis exploratorio, y solo se usará una vez, en la entrega final. Conserva la misma proporción de desertores y de cohortes, y cada estudiante queda en un solo lado.
 
-\textbf{2. Transformaciones dentro de un \texttt{Pipeline}.} Las transformaciones se encadenaron en este orden: (1) imputación con la mediana más un indicador de faltante; (2) estandarización de las numéricas; (3) codificación \textit{one-hot} de las categóricas (las categorías con menos de 30 registros se agrupan); (4) balanceo opcional con SMOTE, y (5) el clasificador. Cada paso aprende sus parámetros (medianas, medias, desviaciones, categorías y vecinos) solo con el entrenamiento de cada pliegue y los aplica sin recalcularlos a la validación; si el escalamiento usara la media de todos los datos, la validación influiría en el entrenamiento. Se estandariza \emph{antes} de SMOTE porque este interpola entre vecinos según la distancia euclidiana, que sin escalar quedaría dominada por el examen de admisión (hasta 1.600) frente al porcentaje de beca (hasta 1). El escalamiento es indispensable para la regresión logística y la SVM, mientras que los árboles son invariantes a él; por eso CatBoost recibe las variables sin transformar. SMOTE actúa solo al entrenar, de modo que la validación conserva la proporción real de desertores. Las variables construidas son operaciones fila a fila, sin parámetros aprendidos, y pruebas automáticas del repositorio verifican que el imputador y el escalador aprenden solo de las filas de entrenamiento.
+\textbf{2. Preparación dentro de un \texttt{Pipeline}.} Todos los pasos van encadenados en este orden: (1) rellenar los datos faltantes con la mediana y marcar, con una variable adicional, que faltaban; (2) estandarizar las variables numéricas; (3) convertir las categóricas en columnas de ceros y unos (\textit{one-hot}), agrupando las categorías con menos de 30 estudiantes; (4) balancear las clases con SMOTE, si la validación lo elige, y (5) entrenar el modelo. La clave es que cada paso aprende solo de los datos de entrenamiento de cada partición (la mediana, la media, las categorías) y luego aplica lo aprendido, sin recalcular, a los datos de validación. Si la estandarización usara la media de todos los datos, el modelo ya tendría una pista de los estudiantes con que se evalúa. El orden también importa: se estandariza antes de SMOTE porque SMOTE crea estudiantes sintéticos a partir de los más parecidos, y para medir parecido las variables deben estar en la misma escala. Sin ese paso, el examen de admisión (hasta 1.600 puntos) pesaría mucho más que el porcentaje de beca (hasta 1). La regresión logística y la SVM también necesitan esa escala común; los árboles no, porque solo comparan valores dentro de una misma variable, y por eso CatBoost recibe los datos sin transformar. SMOTE actúa solo al entrenar, así que la validación conserva la proporción real de desertores. Pruebas automáticas del repositorio verifican que estos pasos aprenden únicamente de los datos de entrenamiento.
 
-\textbf{3. Validación cruzada anidada.} Los datos de desarrollo se dividieron en cinco partes, agrupando por estudiante y conservando la proporción de desertores. En cada una de cinco rondas, cuatro partes se usan para entrenar y la quinta para evaluar. Dentro de las cuatro de entrenamiento, una segunda validación cruzada de tres partes elige los hiperparámetros, y una tercera, también interna, elige el umbral de decisión. Así, la parte usada para evaluar nunca interviene en ninguna elección. Los resultados se reportan como promedio y desviación estándar de las cinco rondas.
+\textbf{3. Validación cruzada anidada.} Los datos de desarrollo se dividieron en cinco partes, sin repartir a un mismo estudiante entre dos partes y conservando la proporción de desertores. En cada una de cinco rondas, el modelo se entrena con cuatro partes y se evalúa con la quinta. Las decisiones (qué hiperparámetros usar y a partir de qué probabilidad emitir una alerta) se toman con nuevas divisiones internas de esas cuatro partes. Así, la parte con que se evalúa nunca influye en ninguna decisión. Los resultados se reportan como promedio y desviación estándar de las cinco rondas.
 
-\textbf{Efecto de la fuga en el protocolo del artículo.} Villar y Andrade aplican SMOTE a todos los datos antes de separar entrenamiento y validación. Se entrenó el mismo modelo (LightGBM) con ambos protocolos (Tabla~\ref{tab:fuga}). Con el protocolo del artículo los resultados parecen excelentes; con el flujo descrito, son modestos. Al aplicar SMOTE antes de separar, los desertores sintéticos de la validación son mezclas de estudiantes que el modelo ya vio al entrenar: reconoce casos casi repetidos en lugar de predecir casos nuevos. Esto sugiere que parte del alto desempeño reportado en el artículo (F1 de 0,83 a 0,88) proviene del protocolo y no del modelo.
+\textbf{Efecto de la fuga en el procedimiento del artículo.} Villar y Andrade aplican SMOTE a todos los datos antes de separar entrenamiento y validación. Para medir el efecto se entrenó el mismo modelo, LightGBM, de las dos maneras (Tabla~\ref{tab:fuga}). Con el procedimiento del artículo, el F1 de la clase deserción es de 0,95; con el nuestro, de 0,12. La razón es sencilla: SMOTE crea desertores sintéticos mezclando desertores reales. Si se crean antes de separar, los desertores de validación son mezclas de estudiantes que el modelo ya vio, y acertar es fácil. Esto sugiere que parte del alto desempeño del artículo (F1 de 0,83 a 0,88) viene del procedimiento y no del modelo.
 
 \begin{table}[H]
 \centering
 \small
-\caption{Mismo modelo evaluado con los dos protocolos (cinco rondas). El PR-AUC se explica en la Sección~4.}
+\caption{Mismo modelo evaluado con los dos procedimientos (cinco rondas). El PR-AUC se explica en la Sección~4.}
 \label{tab:fuga}
 \input{../tables/tabla_fuga.tex}
 \end{table}
@@ -169,7 +166,7 @@ Hay \emph{fuga de datos} cuando el modelo usa, al entrenar, información que no 
 % ================= SECCIÓN 3 =================
 \section{Reproducción y adaptación del método}
 
-El método del artículo consiste en comparar árboles y ensambles clásicos con cuatro algoritmos de \textit{boosting}, equilibrar las clases con SMOTE, ajustar los hiperparámetros e interpretar el mejor modelo con SHAP. La Tabla~\ref{tab:adaptacion} resume qué se conservó y qué se modificó.
+El método del artículo compara árboles y ensambles clásicos con cuatro algoritmos de \textit{boosting}, equilibra las clases con SMOTE (Chawla et al., 2002), ajusta los hiperparámetros e interpreta el mejor modelo con SHAP (Lundberg y Lee, 2017). La Tabla~\ref{tab:adaptacion} resume qué se conservó, qué se cambió y por qué.
 
 \begin{table}[H]
 \centering
@@ -181,25 +178,25 @@ El método del artículo consiste en comparar árboles y ensambles clásicos con
 Elemento & Artículo & Este trabajo \\
 \midrule
 Información & Ingreso + desempeño de los primeros semestres & Ingreso + desempeño del primer semestre (cohortes AD19--AD20) \\
-Variable objetivo & Tres clases: graduado, rezagado y desertor & Binaria: deserta o no en el primer año (el dataset no registra graduación) \\
-Modelos & Árbol, Random Forest, SVM, Gradient Boosting, XGBoost, LightGBM, CatBoost & Los mismos, más regresión logística como referencia; CatBoost con categóricas nativas \\
-Balanceo de clases & SMOTE sobre todos los datos & SMOTE solo sobre el entrenamiento, y como hiperparámetro: la validación decide si se usa \\
+Variable objetivo & Tres clases: graduado, rezagado y desertor & Dos clases: deserta o no en el primer año (el dataset no registra la graduación) \\
+Modelos & Árbol, Random Forest, SVM, Gradient Boosting, XGBoost, LightGBM, CatBoost & Los mismos, más la regresión logística como referencia \\
+Balanceo de clases & SMOTE sobre todos los datos & SMOTE solo sobre el entrenamiento, y como una opción más: la validación decide si se usa \\
 Hiperparámetros & Optuna & \texttt{GridSearchCV}, herramienta del curso, dentro de la validación anidada \\
-Métrica principal & F1 ponderado & PR-AUC, \textit{recall} y precisión de la clase deserción \\
+Métrica principal & F1 ponderado & PR-AUC, más \textit{recall} y precisión de la clase deserción \\
 Comparación & Prueba t pareada & Prueba t corregida de Nadeau y Bengio (2003) \\
-Interpretación & SHAP & SHAP, repetido en cada ronda para verificar su estabilidad \\
+Interpretación & SHAP & SHAP, repetido en cada ronda para comprobar su estabilidad \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Modelos comparados.} Se compararon nueve modelos: dos líneas base (un clasificador que asigna a todos la probabilidad promedio de desertar y un árbol de decisión sin poda), la regresión logística como referencia del curso anterior y los seis modelos avanzados del artículo: Random Forest, SVM con kernel RBF, Gradient Boosting, XGBoost, LightGBM y CatBoost. CatBoost recibe las variables categóricas sin codificar, que es su forma de uso prevista, y por eso compensa el desbalance con pesos de clase en lugar de SMOTE. Para manejar el volumen de datos, la SVM usa una aproximación del kernel (Nystroem) y Gradient Boosting, su versión por histogramas.
+\textbf{Modelos comparados.} Se compararon nueve modelos. Dos son líneas base: uno que asigna a todos la misma probabilidad de desertar y un árbol de decisión sin poda. La regresión logística sirve de referencia, porque es el modelo de Machine Learning I. Los otros seis son los del artículo: Random Forest, SVM con kernel RBF, Gradient Boosting, XGBoost, LightGBM y CatBoost. CatBoost trabaja directamente con las variables categóricas, sin convertirlas en ceros y unos; como SMOTE no funciona con ese tipo de variables, en su caso el desbalance se trata dando más peso a los desertores. Para que la SVM fuera viable con casi 20.000 estudiantes, se usó una aproximación de su kernel (Nystroem).
 
-\textbf{Ajuste de hiperparámetros.} Cada modelo tiene una rejilla con los hiperparámetros que controlan su complejidad y regularización, más la opción de balanceo (Tabla~\ref{tab:hiper}). En cada ronda, \texttt{GridSearchCV} probó todas las combinaciones (de 4 a 24 por modelo) y eligió la de mayor PR-AUC en la validación interna. La validación \textbf{no eligió SMOTE en ninguna de las 30 decisiones} (seis modelos por cinco rondas), y CatBoost tampoco eligió pesos de clase: crear o reponderar desertores no mejora la capacidad de ordenar a los estudiantes por riesgo, y el desbalance se atiende con el umbral de decisión (Sección~4). Se eligieron configuraciones simples: árboles de 2 a 4 niveles o de 4 hojas y regularización fuerte. La curva de validación de LightGBM (Figura~\ref{fig:curvas}) muestra por qué: con más hojas por árbol, el PR-AUC de entrenamiento sube de 0,24 a 0,91, mientras que el de validación alcanza su máximo con 8 hojas (0,250) y luego cae, la firma del sobreajuste. En la SVM, $\gamma$ y $C$ quedaron en el extremo superior de la rejilla, pero ampliar $C$ a 1 ya no mejora (0,232 frente a 0,235). Por su costo, la rejilla de CatBoost se limitó a la profundidad y los pesos de clase.
+\textbf{Ajuste de hiperparámetros.} Cada modelo tiene una rejilla de hiperparámetros que controlan qué tan complejo puede ser (Tabla~\ref{tab:hiper}). En cada ronda, \texttt{GridSearchCV} probó todas las combinaciones, de 4 a 24 según el modelo, y eligió la de mayor PR-AUC. Usar o no SMOTE se trató como una opción más de la rejilla, y el resultado es claro: la validación \textbf{no eligió SMOTE en ninguna de las 30 decisiones} (seis modelos por cinco rondas), y CatBoost tampoco eligió dar más peso a los desertores. Crear desertores sintéticos no ayuda a ordenar a los estudiantes por riesgo; el desbalance se maneja mejor al fijar el umbral de alerta (Sección~4). Las configuraciones elegidas son simples: árboles poco profundos y regularización fuerte. La Figura~\ref{fig:curvas} explica por qué. Cuando LightGBM puede usar árboles más grandes, su resultado en entrenamiento sube de 0,24 a 0,91, pero en validación solo mejora hasta las 8 hojas por árbol (0,250) y luego empeora: el modelo empieza a memorizar casos en lugar de aprender patrones. En la SVM, los valores elegidos quedaron en el borde de la rejilla, pero la curva muestra que ampliar $C$ a 1 ya no mejora (0,232 frente a 0,235). Por su alto costo (Sección~4), la rejilla de CatBoost se limitó a la profundidad y al peso de los desertores.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.86\linewidth]{fig06_curva_validacion.png}
-\caption{Curvas de validación alrededor de la configuración elegida (media $\pm$ desviación estándar de cinco rondas). La brecha creciente entre entrenamiento y validación indica sobreajuste.}
+\caption{Curvas de validación alrededor de la configuración elegida (media $\pm$ desviación estándar de cinco rondas). Cuando la distancia entre entrenamiento y validación crece, el modelo está memorizando.}
 \label{fig:curvas}
 \end{figure}
 
@@ -211,22 +208,16 @@ Interpretación & SHAP & SHAP, repetido en cada ronda para verificar su estabili
 \input{../tables/tabla_hiperparametros.tex}
 \end{table}
 
-\textbf{Otros elementos del artículo.} (i) \emph{SMOTE frente a ADASYN.} Como en el artículo, con un árbol de control SMOTE superó levemente a ADASYN (F1 de la clase deserción de 0,154 frente a 0,148), pero ninguno superó al árbol sin balanceo (0,162). (ii) \emph{Isolation Forest.} El artículo lo usa para ver si los desertores son casos atípicos; se repitió su resultado negativo (ROC-AUC de 0,55, donde 0,5 equivale al azar). (iii) \emph{Regresión logística.} El artículo la descartó por multicolinealidad. Aquí se reprodujo el problema (VIF de 10\textsuperscript{7}), causado por el \% total de apoyo, que es la suma exacta de beca y crédito; al excluirlo, el VIF de la beca baja a 1,3 y el modelo se conservó como referencia. La única colinealidad restante es deliberada: la brecha es la resta de dos variables del modelo, útil para los árboles (que dividen por una variable a la vez y no pueden calcularla) e innecesaria para la regresión logística, cuya regularización L2 mantiene estables los coeficientes.
+\textbf{Otros elementos del artículo.} (i) \emph{SMOTE frente a ADASYN.} Como en el artículo, con un árbol de decisión SMOTE fue algo mejor que ADASYN (F1 de la clase deserción de 0,154 frente a 0,148), pero el árbol sin balanceo superó a ambos (0,162). (ii) \emph{Isolation Forest.} El artículo lo usa para ver si los desertores son estudiantes atípicos. Aquí tampoco lo son: el método casi no los distingue (ROC-AUC de 0,55, cuando 0,5 equivale al azar). (iii) \emph{Regresión logística.} El artículo la descartó porque varias variables repetían información (multicolinealidad). Aquí ocurrió lo mismo, y la causa era concreta: el porcentaje total de apoyo es la suma exacta de beca y crédito. Al quitar ese total, el problema desaparece (el VIF de la beca baja de 10\textsuperscript{7} a 1,3) y el modelo se pudo conservar. La brecha de promedios también es la resta de dos variables del modelo, pero se dejó a propósito: a los árboles les sirve, porque analizan una variable a la vez y no pueden calcular esa resta por sí solos; a la regresión logística no le aporta, pero su regularización evita que la repetición la desestabilice.
 
-\textbf{Por qué no se usaron modelos de densidad ni de clustering.} La Primera entrega los dejó para fases posteriores, siguiendo el calendario del curso, pero se decidió no incluirlos. La guía pide comparar modelos ``según el artículo'', y Villar y Andrade solo usan un método no supervisado, Isolation Forest, que sí se reprodujo. Su resultado refuta la hipótesis que justificaría un enfoque de densidad: los desertores no ocupan regiones atípicas o poco densas. Además, el problema es supervisado: el clustering agrupa sin usar la etiqueta, sin garantía de separar a quienes desertan, y un clasificador generativo, como una mezcla gaussiana por clase, supone variables continuas y aproximadamente normales, mientras que aquí 10 de las 23 son categóricas y las numéricas son asimétricas y tienen faltantes.
+\textbf{Por qué no se usaron modelos de densidad ni de clustering.} La Primera entrega los dejó para más adelante, según el calendario del curso, pero al final no se incluyeron, por tres razones. Primera, la guía del proyecto pide comparar modelos según el artículo, y el artículo solo usa un método de este tipo, Isolation Forest, que sí se replicó. Segunda, ese resultado muestra que los desertores no forman un grupo aparte ni atípico en los datos, que es justo lo que un enfoque de densidad necesitaría para funcionar. Tercera, el problema es supervisado: el clustering agrupa estudiantes sin mirar si desertaron, y nada garantiza que esos grupos separen a quienes se van. Además, modelos como las mezclas gaussianas suponen variables continuas con forma de campana, y aquí 10 de las 23 variables son categóricas.
 
 % ================= SECCIÓN 4 =================
 \section{Validación, métricas e interpretación preliminar}
 
-\textbf{Métricas.} Con solo 7,8\,\% de desertores, la exactitud y el F1 ponderado que usa el artículo son engañosos: un modelo que declara a todos como no desertores obtiene un F1 ponderado de 0,89 sin detectar a ningún desertor. Por eso se usaron tres métricas centradas en la clase deserción:
-\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \textbf{PR-AUC} (área bajo la curva precisión--\textit{recall}): mide qué tan bien el modelo ordena a los estudiantes de mayor a menor riesgo, sin depender de un umbral. Un modelo al azar obtiene la proporción de desertores (0,078) y uno perfecto obtiene 1. Se usó para elegir los hiperparámetros y comparar los modelos.
-\item \textbf{\textit{Recall}:} proporción de desertores que el modelo detecta.
-\item \textbf{Precisión:} proporción de alertas que corresponden a desertores reales.
-\end{itemize}
-El \emph{umbral de decisión} es la probabilidad a partir de la cual el modelo emite una alerta. Se eligió dentro de los datos de entrenamiento para maximizar la métrica F2, que da al \textit{recall} el doble de peso que a la precisión. Así se formaliza la prioridad definida en la Primera entrega: no detectar a un desertor cuesta más que acompañar a un estudiante que no estaba en riesgo.
+\textbf{Métricas.} Con solo 7,8\,\% de desertores, el F1 ponderado que usa el artículo engaña: un modelo que no alerta a nadie obtiene 0,89 sin encontrar a un solo desertor. Por eso los modelos se compararon con el PR-AUC, que mide qué tan bien ordenan a los estudiantes de mayor a menor riesgo (el azar obtiene 0,078 y un modelo perfecto, 1). También se reportan el \textit{recall}, la parte de los desertores que se detecta, y la precisión, la parte de las alertas que acierta. La alerta se emite cuando la probabilidad estimada supera un umbral, que se eligió con los datos de entrenamiento para maximizar F2, una medida que da al \textit{recall} el doble de peso que a la precisión. Así se traduce la prioridad fijada en la Primera entrega: dejar pasar a un desertor cuesta más que acompañar a un estudiante que no lo necesitaba.
 
-\textbf{Resultados.} La Tabla~\ref{tab:resultados} y la Figura~\ref{fig:comparacion} resumen el desempeño. Todos los modelos avanzados superan con claridad a las líneas base: el árbol sin poda obtiene un PR-AUC casi igual al azar (0,091 frente a 0,078) porque memoriza los datos de entrenamiento. Las líneas base aparecen con \textit{recall} de 1,00 porque asignan a todos el mismo puntaje (o solo dos valores) y el umbral que maximiza F2 termina alertando a todos; por eso se comparan por PR-AUC. Entre los modelos avanzados, la familia de \textit{boosting} encabeza y está prácticamente empatada: CatBoost (0,248), XGBoost (0,248), LightGBM (0,247) y Gradient Boosting (0,245). Les siguen la SVM (0,235), Random Forest (0,230) y la regresión logística (0,224). La ROC-AUC, cercana a 0,72 en todos los casos, confirma lo que anticipó el análisis exploratorio: la señal es débil y está repartida entre muchas variables.
+\textbf{Resultados.} La Tabla~\ref{tab:resultados} y la Figura~\ref{fig:comparacion} resumen el desempeño. Todos los modelos avanzados superan con claridad a las líneas base. El árbol sin poda queda casi al nivel del azar (0,091 frente a 0,078) porque memoriza los datos de entrenamiento. Las líneas base aparecen con \textit{recall} de 1,00 porque dan a todos la misma probabilidad (o casi), así que el umbral termina alertando a todos; por eso se comparan por PR-AUC. Entre los modelos avanzados, los de \textit{boosting} encabezan y están prácticamente empatados: CatBoost (0,248), XGBoost (0,248), LightGBM (0,247) y Gradient Boosting (0,245). Les siguen la SVM (0,235), Random Forest (0,230) y la regresión logística (0,224). Que todos ronden una ROC-AUC de 0,72 confirma lo que mostró el análisis exploratorio: los datos contienen una señal real, pero débil y repartida entre muchas variables.
 
 \begin{table}[H]
 \centering
@@ -243,9 +234,9 @@ El \emph{umbral de decisión} es la probabilidad a partir de la cual el modelo e
 \label{fig:comparacion}
 \end{figure}
 
-\textbf{\textquestiondown{}Son reales las diferencias?} Se usó la prueba t corregida de Nadeau y Bengio (2003), que, a diferencia de la prueba t pareada del artículo, tiene en cuenta que las cinco rondas comparten buena parte de los datos de entrenamiento. CatBoost no se distingue de XGBoost, LightGBM ni Gradient Boosting ($p \geq 0{,}44$), ni con claridad de la SVM ($p=0{,}09$) o de Random Forest ($p=0{,}13$); sí supera a la regresión logística ($p=0{,}026$) y a las líneas base ($p<0{,}001$). Con la prueba t pareada, las diferencias con la SVM y Random Forest parecerían significativas ($p=0{,}030$ y $0{,}047$), lo que muestra por qué la corrección importa. En síntesis, el \textit{boosting} mejora de forma real, pero pequeña, a un modelo lineal bien regularizado.
+\textbf{\textquestiondown{}Son reales las diferencias?} Las cinco rondas comparten buena parte de sus datos de entrenamiento, así que sus resultados no son independientes. La prueba t corregida de Nadeau y Bengio (2003) tiene en cuenta ese solapamiento; la prueba t pareada del artículo, no. Con la prueba corregida, CatBoost no se distingue de XGBoost, LightGBM ni Gradient Boosting ($p \geq 0{,}44$), ni con claridad de la SVM ($p=0{,}09$) o de Random Forest ($p=0{,}13$); sí supera a la regresión logística ($p=0{,}026$) y a las líneas base ($p<0{,}001$). Con la prueba sin corregir, las diferencias con la SVM y Random Forest habrían parecido reales ($p=0{,}030$ y $0{,}047$). En resumen, el \textit{boosting} mejora a un buen modelo lineal, pero poco.
 
-\textbf{Costo computacional.} Con desempeños empatados, el costo es un criterio legítimo de desempate (Tabla~\ref{tab:costo}). CatBoost, primero por un margen mínimo, es el más caro de ajustar: 16 segundos por modelo y 30 minutos de búsqueda con solo cuatro combinaciones, frente a 0,5 segundos y 5,5 minutos con 24 combinaciones de LightGBM, que obtiene el mismo PR-AUC. Random Forest ocupa 27 MB, frente a menos de 0,4 MB de los modelos de \textit{boosting}. Predecir es barato para todos: menos de 16 milisegundos por cada mil estudiantes.
+\textbf{Costo computacional.} Si varios modelos empatan, conviene preferir el más barato (Tabla~\ref{tab:costo}). CatBoost, primero por un margen mínimo, es el más lento: tarda 16 segundos en entrenarse y su búsqueda de hiperparámetros tomó 30 minutos con solo cuatro combinaciones. LightGBM logra el mismo resultado entrenándose en medio segundo y probando 24 combinaciones en 5,5 minutos. Random Forest ocupa 27 MB, frente a menos de 0,4 MB de los modelos de \textit{boosting}. Predecir es rápido con todos: menos de 16 milisegundos por cada mil estudiantes.
 
 \begin{table}[H]
 \centering
@@ -255,9 +246,9 @@ El \emph{umbral de decisión} es la probabilidad a partir de la cual el modelo e
 \resizebox{\linewidth}{!}{\input{../tables/tabla_costo.tex}}
 \end{table}
 
-\textbf{Lectura de los resultados.} Con el umbral F2, CatBoost detecta el 66\,\% de los desertores, pero alerta al 39\,\% de los estudiantes y solo 13 de cada 100 alertas corresponden a desertores reales. Una lectura más práctica supone que la universidad solo puede acompañar a una parte de los estudiantes: si atiende al 20\,\% con mayor riesgo, detecta al 46\,\% de los desertores, 2,3 veces lo que lograría eligiendo al azar; si atiende al 10\,\%, detecta al 32\,\%, y una de cada cuatro alertas es correcta.
+\textbf{Qué significa en la práctica.} Con el umbral elegido, CatBoost detecta al 66\,\% de los desertores, pero alerta al 39\,\% de los estudiantes, y solo 13 de cada 100 alertas son desertores reales. Es más útil pensarlo así: si la universidad solo puede acompañar al 20\,\% de estudiantes con mayor riesgo, el modelo le permite llegar al 46\,\% de quienes van a desertar, 2,3 veces más que eligiendo al azar. Si acompaña al 10\,\%, llega al 32\,\%, y una de cada cuatro alertas es correcta.
 
-\textbf{Variables más influyentes.} SHAP asigna a cada variable su contribución a la predicción de cada estudiante. Se aplicó a CatBoost en las cinco rondas para verificar la estabilidad de las conclusiones. El promedio del primer semestre es la variable más influyente en cuatro de las cinco rondas, y el porcentaje de beca, en la restante; les siguen el promedio de bachillerato, la rúbrica de admisión, el programa y la nota de matemáticas. La Figura~\ref{fig:shap} muestra la dirección de los efectos: un promedio del semestre bajo eleva mucho el riesgo, mientras que uno alto lo reduce poco; las becas altas y un mejor desempeño previo se asocian con menor riesgo; la edad mayor y una caída del rendimiento respecto al bachillerato (brecha negativa) lo aumentan. Se reproduce así el hallazgo central del artículo: el desempeño académico temprano es el mejor predictor de la deserción. Estas relaciones son predictivas, no causales.
+\textbf{Variables más influyentes.} Para saber en qué se basa el modelo se usó SHAP, que reparte cada predicción entre las variables. Se calculó en las cinco rondas para comprobar que las conclusiones no cambian con los datos. El promedio del primer semestre fue la variable más influyente en cuatro rondas, y el porcentaje de beca en la restante; después vienen el promedio de bachillerato, la rúbrica de admisión, el programa y la nota de matemáticas. La Figura~\ref{fig:shap} muestra en qué dirección actúa cada una: un promedio del semestre bajo sube mucho el riesgo, mientras que uno alto lo baja poco; las becas altas y un buen desempeño previo lo reducen; tener más edad y bajar el rendimiento respecto al bachillerato lo aumentan. Es el mismo hallazgo central del artículo: el desempeño académico temprano es el mejor predictor de la deserción. Son asociaciones útiles para predecir, no causas.
 
 \begin{figure}[H]
 \centering
@@ -266,35 +257,58 @@ El \emph{umbral de decisión} es la probabilidad a partir de la cual el modelo e
 \label{fig:shap}
 \end{figure}
 
-\textbf{Errores e implicaciones.} El modelo casi no detecta a los desertores con beca por talento académico (6 de cada 100): su riesgo estimado es bajo y las razones por las que se van no aparecen en los datos. En cambio, emite alertas para el 59\,\% de los estudiantes sin beca que no desertan. Por eso, el modelo debe usarse para priorizar el acompañamiento y no para etiquetar a los estudiantes, ya que varias de sus señales reflejan condiciones económicas.
+\textbf{Errores e implicaciones.} El modelo casi no detecta a los desertores con beca por talento académico (6 de cada 100): como grupo tienen bajo riesgo, y lo que los lleva a irse no está en los datos. En cambio, alerta al 59\,\% de los estudiantes sin beca que no desertan. Por eso el modelo sirve para decidir a quién acompañar primero, no para etiquetar a los estudiantes, ya que varias de sus señales reflejan la situación económica.
 
-\textbf{Pasos para la entrega final.} Evaluar una sola vez el modelo elegido, con su umbral ya fijado, en el conjunto de prueba sellado; profundizar la interpretación con gráficos de dependencia, y desplegar el modelo en una aplicación de Streamlit que explique cada predicción.
+\textbf{Pasos para la entrega final.} Evaluar una sola vez el modelo elegido, con su umbral ya fijado, en el conjunto de prueba; profundizar la interpretación, y desplegarlo en una aplicación de Streamlit que explique cada predicción.
 
-\textbf{Declaración de uso de IA generativa.} Se utilizó un asistente de inteligencia artificial (Claude, de Anthropic) como apoyo en la escritura del código y la revisión del texto. Los autores verificaron los resultados y pueden sustentar cada decisión técnica.
+\textbf{Código y uso de IA.} El análisis se hizo en Python con scikit-learn (Pedregosa et al., 2011), imbalanced-learn (Lemaître et al., 2017), XGBoost (Chen y Guestrin, 2016), LightGBM (Ke et al., 2017), CatBoost (Prokhorenkova et al., 2018) y SHAP. Se utilizó un asistente de inteligencia artificial (Claude, de Anthropic) como apoyo en la escritura del código y la revisión del texto; los autores verificaron los resultados y pueden sustentar cada decisión técnica.
 
 % ================= BIBLIOGRAFÍA =================
-\begin{thebibliography}{9}
+\begin{thebibliography}{10}
 \footnotesize
 \setlength{\itemsep}{1pt}
-
-\bibitem{villar2024}
-Villar, A. \& Robledo Velini de Andrade, C. (2024). Supervised machine learning algorithms for predicting student dropout and academic success: a comparative study. \textit{Discover Artificial Intelligence}, 4:2. \url{https://doi.org/10.1007/s44163-023-00079-z}
 
 \bibitem{alvarado2022}
 Alvarado-Uribe, J., Mejía-Almada, P., Masetto Herrera, A. L., Molontay, R., Hilliger, I., Hegde, V., Montemayor Gallegos, J. E., Ramírez Díaz, R. A., \& Ceballos, H. G. (2022). Student Dataset from Tecnologico de Monterrey in Mexico to Predict Dropout in Higher Education. \textit{Data}, 7(9), 119. \url{https://doi.org/10.3390/data7090119}
 
-\bibitem{martins2021}
-Martins, M. V., Tolledo, D., Machado, J., Baptista, L. M., \& Realinho, V. (2021). Early prediction of student's performance in higher education: a case study. En \textit{Trends and Applications in Information Systems and Technologies}, vol. 9 (pp. 166--175). Springer.
-
-\bibitem{nadeau2003}
-Nadeau, C. \& Bengio, Y. (2003). Inference for the generalization error. \textit{Machine Learning}, 52(3), 239--281.
-
 \bibitem{chawla2002}
 Chawla, N. V., Bowyer, K. W., Hall, L. O., \& Kegelmeyer, W. P. (2002). SMOTE: synthetic minority over-sampling technique. \textit{Journal of Artificial Intelligence Research}, 16, 321--357.
+
+\bibitem{chen2016}
+Chen, T. \& Guestrin, C. (2016). XGBoost: A scalable tree boosting system. En \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining} (pp. 785--794).
+
+\bibitem{ke2017}
+Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., \& Liu, T.-Y. (2017). LightGBM: A highly efficient gradient boosting decision tree. \textit{Advances in Neural Information Processing Systems}, 30.
+
+\bibitem{lemaitre2017}
+Lemaître, G., Nogueira, F., \& Aridas, C. K. (2017). Imbalanced-learn: A Python toolbox to tackle the curse of imbalanced datasets in machine learning. \textit{Journal of Machine Learning Research}, 18(17), 1--5.
 
 \bibitem{lundberg2017}
 Lundberg, S. M. \& Lee, S.-I. (2017). A unified approach to interpreting model predictions. \textit{Advances in Neural Information Processing Systems}, 30.
 
+\bibitem{nadeau2003}
+Nadeau, C. \& Bengio, Y. (2003). Inference for the generalization error. \textit{Machine Learning}, 52(3), 239--281.
+
+\bibitem{pedregosa2011}
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., et al. (2011). Scikit-learn: Machine learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825--2830.
+
+\bibitem{prokhorenkova2018}
+Prokhorenkova, L., Gusev, G., Vorobev, A., Dorogush, A. V., \& Gulin, A. (2018). CatBoost: unbiased boosting with categorical features. \textit{Advances in Neural Information Processing Systems}, 31.
+
+\bibitem{villar2024}
+Villar, A. \& Robledo Velini de Andrade, C. (2024). Supervised machine learning algorithms for predicting student dropout and academic success: a comparative study. \textit{Discover Artificial Intelligence}, 4:2. \url{https://doi.org/10.1007/s44163-023-00079-z}
+
 \end{thebibliography}
+
+% ================= ANEXO =================
+\section*{Anexo: código y reproducibilidad}
+
+El código está en \repo. Para repetir todos los resultados de este informe:
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=2pt]
+\item Instalar el entorno con \texttt{pip install -e .} (las versiones de las librerías están fijadas).
+\item Solicitar el dataset al TEC DataHub y copiar el archivo de Excel recibido en la carpeta \texttt{data/raw/}.
+\item Ejecutar \texttt{desercion all}.
+\end{enumerate}
+Todo el flujo usa la semilla 42, de modo que se obtienen las mismas cifras. El análisis exploratorio completo está en \texttt{notebooks/01\us exploracion\us datos.ipynb}, y las pruebas automáticas (\texttt{pytest}) verifican, con datos sintéticos, que la preparación de los datos no filtra información de validación.
 
 \end{document}
