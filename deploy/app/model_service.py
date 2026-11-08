@@ -121,10 +121,27 @@ def example_batch(metadata: dict[str, Any], n: int = 20, seed: int = 42) -> pd.D
     return pd.DataFrame(rows)
 
 
+# Niveles de riesgo, cada uno ligado a una acción (pocos niveles para evitar fatiga de alertas):
+# - Alto: dentro del 20 % de mayor riesgo (en prueba, ese grupo concentra ~48 % de los desertores).
+# - Medio: supera el umbral validado (F2) pero no está en el 20 % superior.
+# - Bajo: por debajo del umbral.
+TIERS = ("Alto", "Medio", "Bajo")
+
+
+def risk_tier(probability, metadata: dict[str, Any]):
+    """Nivel de riesgo (Alto, Medio o Bajo) de una probabilidad o de un arreglo de ellas."""
+    p80 = metadata["risk_percentiles"][79]  # percentiles 1..99: el índice 79 es el 80
+    thr = float(metadata["decision_threshold"])
+    prob = np.asarray(probability, dtype=float)
+    tier = np.where(prob >= p80, "Alto", np.where(prob >= thr, "Medio", "Bajo"))
+    return str(tier) if tier.ndim == 0 else tier
+
+
 def predict_batch(model: Any, metadata: dict[str, Any], raw: pd.DataFrame) -> pd.DataFrame:
     """Predice una tabla de estudiantes. Las filas inválidas no se predicen y reportan su error.
 
-    Devuelve las columnas originales más probabilidad, decisión, posición del riesgo y error.
+    Devuelve las columnas originales más probabilidad, nivel de riesgo, decisión, posición del
+    riesgo y error.
     """
     frame, errors = validate_frame(raw, metadata)
     out = raw.reset_index(drop=True).copy()
@@ -134,6 +151,7 @@ def predict_batch(model: Any, metadata: dict[str, Any], raw: pd.DataFrame) -> pd
         prob[ok] = model.predict_proba(frame[ok])[:, 1]
     threshold = float(metadata["decision_threshold"])
     out["probabilidad"] = prob
+    out["nivel_riesgo"] = np.where(ok, risk_tier(prob.fillna(0).to_numpy(), metadata), "")
     out["alerta"] = np.where(ok, np.where(prob >= threshold, "Priorizar acompañamiento",
                                           "Sin alerta"), "")
     out["percentil_riesgo"] = pd.Series(risk_percentile(prob.fillna(0).to_numpy(), metadata),
@@ -143,36 +161,59 @@ def predict_batch(model: Any, metadata: dict[str, Any], raw: pd.DataFrame) -> pd
 
 
 def predict(model: Any, metadata: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
-    """Probabilidad, decisión con el umbral validado y posición relativa del riesgo."""
+    """Probabilidad, nivel de riesgo, decisión con el umbral validado y posición relativa."""
     frame = make_frame(values, metadata)
     probability = float(model.predict_proba(frame)[0, 1])
     threshold = float(metadata["decision_threshold"])
     return {"probability": probability, "threshold": threshold,
             "prediction": int(probability >= threshold),
+            "tier": risk_tier(probability, metadata),
             "percentile": risk_percentile(probability, metadata)}
 
 
-def local_shap_values(model: Any, metadata: dict[str, Any], values: dict[str, Any]) -> pd.DataFrame:
-    """Aporte SHAP (log-odds) de cada variable original a esta predicción.
+def _labels(metadata: dict[str, Any]) -> dict[str, str]:
+    labels = {f: spec["label"] for f, spec in metadata["input_contract"].items()}
+    labels["brecha.promedio"] = "Brecha promedio 1.er sem. − bachillerato"
+    return labels
 
-    Se explica el clasificador sobre los datos ya transformados y se suman las columnas
-    one-hot y la marca de faltante de cada variable para leerla como una sola.
+
+def shap_by_variable(model: Any, metadata: dict[str, Any], frame: pd.DataFrame) -> pd.DataFrame:
+    """Aportes SHAP (log-odds) por variable original, una fila por estudiante ya validado.
+
+    Se explica el clasificador sobre los datos transformados y se suman las columnas one-hot y
+    la marca de faltante de cada variable para leerla como una sola.
     """
     import warnings
 
     import shap
 
     prep, clf = model.named_steps["prep"], model.named_steps["clf"]
-    Xt = prep.transform(make_frame(values, metadata))
+    Xt = prep.transform(frame)
     with warnings.catch_warnings():  # aviso informativo de SHAP sobre el formato de LightGBM
         warnings.simplefilter("ignore", UserWarning)
         raw = np.asarray(shap.TreeExplainer(clf).shap_values(Xt))
     if raw.ndim == 3:
         raw = raw[..., 1] if raw.shape[-1] == 2 else raw[1]
-    contrib = pd.Series(raw[0], index=prep.get_feature_names_out())
-    by_var = contrib.groupby(pd.Series(metadata["shap_groups"])).sum()
-    labels = {f: spec["label"] for f, spec in metadata["input_contract"].items()}
-    labels["brecha.promedio"] = "Brecha promedio 1.er sem. − bachillerato"
-    out = pd.DataFrame({"variable": by_var.index, "etiqueta": by_var.index.map(labels),
+    contrib = pd.DataFrame(raw, columns=prep.get_feature_names_out(), index=frame.index)
+    return contrib.T.groupby(pd.Series(metadata["shap_groups"])).sum().T
+
+
+def local_shap_values(model: Any, metadata: dict[str, Any], values: dict[str, Any]) -> pd.DataFrame:
+    """Aporte SHAP de cada variable a la predicción de un estudiante, de mayor a menor |aporte|."""
+    by_var = shap_by_variable(model, metadata, make_frame(values, metadata)).iloc[0]
+    out = pd.DataFrame({"variable": by_var.index, "etiqueta": by_var.index.map(_labels(metadata)),
                         "aporte_shap": by_var.to_numpy()})
     return out.reindex(out["aporte_shap"].abs().sort_values(ascending=False).index)
+
+
+def group_drivers(model: Any, metadata: dict[str, Any], raw: pd.DataFrame,
+                  top: int = 8) -> pd.DataFrame:
+    """Variables que más pesan en las predicciones de un grupo (media del |SHAP| por variable)."""
+    frame, errors = validate_frame(raw, metadata)
+    frame = frame[errors == ""]
+    if frame.empty:
+        return pd.DataFrame(columns=["variable", "etiqueta", "importancia"])
+    imp = shap_by_variable(model, metadata, frame).abs().mean().sort_values(ascending=False)
+    imp = imp.head(top)
+    return pd.DataFrame({"variable": imp.index, "etiqueta": imp.index.map(_labels(metadata)),
+                         "importancia": imp.to_numpy()})

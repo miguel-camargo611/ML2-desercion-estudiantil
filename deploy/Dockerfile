@@ -18,6 +18,7 @@ RUN groupadd --system appuser \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+COPY .streamlit/ .streamlit/
 COPY app/ app/
 COPY artifacts/ artifacts/
 

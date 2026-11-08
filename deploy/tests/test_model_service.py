@@ -19,6 +19,7 @@ from model_service import (  # noqa: E402
     make_frame,
     predict,
     predict_batch,
+    risk_tier,
 )
 
 
@@ -114,3 +115,13 @@ def test_batch_rejects_file_without_required_columns(bundle) -> None:
     model, metadata = bundle
     with pytest.raises(ValueError, match="Faltan variables"):
         predict_batch(model, metadata, pd.DataFrame({"id_estudiante": ["X"]}))
+
+
+def test_risk_tiers_follow_threshold_and_top20(bundle) -> None:
+    """Alto = 20 % de mayor riesgo; Medio = supera el umbral; Bajo = por debajo del umbral."""
+    _, metadata = bundle
+    thr, p80 = metadata["decision_threshold"], metadata["risk_percentiles"][79]
+    assert thr < p80
+    assert risk_tier(p80, metadata) == "Alto"
+    assert risk_tier((thr + p80) / 2, metadata) == "Medio"
+    assert risk_tier(thr / 2, metadata) == "Bajo"

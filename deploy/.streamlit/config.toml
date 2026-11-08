@@ -1,0 +1,17 @@
+# Tema claro con la paleta pastel del tablero (el diseño de vidrio está pensado para fondo claro).
+[theme]
+base = "light"
+primaryColor = "#7c5cf0"
+backgroundColor = "#f5f0fb"
+secondaryBackgroundColor = "#efe9fa"
+textColor = "#24213f"
+font = "Plus Jakarta Sans:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap, sans-serif"
+
+[client]
+toolbarMode = "viewer"   # oculta el menú de desarrollo (Deploy, Stop)
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

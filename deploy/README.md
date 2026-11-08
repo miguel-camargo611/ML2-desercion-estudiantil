@@ -7,8 +7,10 @@ validado y su explicación SHAP. Sigue la estructura del laboratorio de la seman
 
 ```
 deploy/
+├── .streamlit/config.toml   # tema claro, paleta y fuente del tablero
 ├── app/main.py              # interfaz (un estudiante, carga de archivo, sobre el modelo)
-├── app/model_service.py     # cargar, validar contra el contrato, predecir y explicar
+├── app/model_service.py     # cargar, validar contra el contrato, predecir, niveles y SHAP
+├── app/theme.py · charts.py # estilo de vidrio pastel y gráficos Altair
 ├── artifacts/               # generados por `desercion final` (no se editan a mano)
 │   ├── model.joblib             # Pipeline completo: imputación, escalado, one-hot y LightGBM
 │   ├── model_metadata.json      # contrato: orden y rangos de variables, umbral, versión, métricas
