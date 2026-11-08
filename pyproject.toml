@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "ruff==0.16.9", "ipykernel==7.3.0", "nbconvert==7.17.1"]
+deploy = ["streamlit==1.66.1"]   # app de deploy/ (la imagen Docker usa deploy/requirements.txt)
 
 [project.scripts]
 desercion = "desercion.cli:main"
@@ -49,5 +50,5 @@ select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "deploy/tests"]
 addopts = "-q"

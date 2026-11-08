@@ -96,19 +96,22 @@ def feature_lists(engineered: list[str] | None = None, selected: bool = True,
     return [c for c in num if c not in out], [c for c in cat if c not in out]
 
 
-def make_preprocessor(num: list[str], cat: list[str]) -> ColumnTransformer:
+def make_preprocessor(num: list[str], cat: list[str],
+                      no_indicator: tuple[str, ...] = ()) -> ColumnTransformer:
     """Imputación + escalamiento (numéricas) y one-hot (categóricas).
 
     Todo se ajusta con ``fit`` sobre la partición de entrenamiento de cada pliegue: medianas,
-    medias/desviaciones y categorías nunca ven los datos de validación.
+    medias/desviaciones y categorías nunca ven los datos de validación. Las numéricas en
+    ``no_indicator`` se imputan sin la columna que marca el dato faltante.
     """
     min_freq = config.load_config()["onehot_min_frequency"]
-    numeric = Pipeline(
-        [
-            ("imputar", SimpleImputer(strategy="median", add_indicator=True)),
+
+    def numeric(indicator: bool) -> Pipeline:
+        return Pipeline([
+            ("imputar", SimpleImputer(strategy="median", add_indicator=indicator)),
             ("escalar", StandardScaler()),
-        ]
-    )
+        ])
+
     categorical = Pipeline(
         [
             ("imputar", SimpleImputer(strategy="constant", fill_value="No information")),
@@ -116,10 +119,12 @@ def make_preprocessor(num: list[str], cat: list[str]) -> ColumnTransformer:
                                      min_frequency=min_freq, sparse_output=False)),
         ]
     )
-    return ColumnTransformer(
-        [("num", numeric, num), ("cat", categorical, cat)],
-        verbose_feature_names_out=False,
-    )
+    with_ind = [c for c in num if c not in no_indicator]
+    without_ind = [c for c in num if c in no_indicator]
+    parts = [("num", numeric(True), with_ind)]
+    if without_ind:
+        parts.append(("num_sin_marca", numeric(False), without_ind))
+    return ColumnTransformer(parts + [("cat", categorical, cat)], verbose_feature_names_out=False)
 
 
 def make_native_preprocessor(num: list[str], cat: list[str]) -> ColumnTransformer:

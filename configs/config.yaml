@@ -8,6 +8,7 @@ paths:
   processed_dir: data/processed
   figures_dir: reports/figures
   tables_dir: reports/tables
+  deploy_artifacts: deploy/artifacts   # modelo y contrato que consume la app
 
 # Población de estudio: solo pregrado (educación superior, como en el artículo base).
 population:
@@ -32,6 +33,10 @@ metrics:
 
 onehot_min_frequency: 30      # categorías con menos registros se agrupan como "infrecuentes"
 
-# Modelo que se interpreta con SHAP en ambos escenarios (mejor en A, empatado con el mejor en B
-# y sin SMOTE, cuyas muestras sintéticas sobre columnas one-hot distorsionan la lectura).
-interpret_model: CatBoost nativo
+# Modelo final (Entrega final). LightGBM empata con el mejor modelo y es el más barato de
+# ajustar; la rúbrica de admisión se imputa sin marca de faltante porque esa marca solo
+# distingue la cohorte AD19 (en AD20 nunca falta) y quitarla no cambia el desempeño
+# (reports/tables/sensibilidad_pliegues.csv).
+final_model:
+  name: LightGBM
+  no_indicator: [admission.rubric]

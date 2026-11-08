@@ -45,3 +45,6 @@ Thumbs.db
 
 # --- Registros de ejecución ---
 logs/
+
+# --- Despliegue: secretos y configuración local ---
+.env

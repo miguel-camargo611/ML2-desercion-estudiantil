@@ -1,0 +1,41 @@
+# Dos servicios: la app (solo en la red interna) y Caddy (único expuesto, con HTTPS automático).
+services:
+  app:
+    build:
+      context: .
+    image: ml2-desercion:1.0.0
+    restart: unless-stopped
+    expose:
+      - "8501"            # visible solo para Caddy; nunca se publica con "ports"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificados: se conservan al recrear el contenedor
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -11,6 +11,7 @@ Uso (desde la raíz del repositorio, con el entorno activado):
     python -m desercion.cli interpret     # SHAP por pliegue y análisis de errores
     python -m desercion.cli figures       # figuras del informe
     python -m desercion.cli report        # tablas LaTeX del informe (reports/tables)
+    python -m desercion.cli final         # modelo final: evaluación única en prueba y artefactos
     python -m desercion.cli all           # todo lo anterior, en orden
 """
 
@@ -22,7 +23,7 @@ import warnings
 
 import pandas as pd
 
-from desercion import config, data, eda, evaluate, experiments, interpret, plots, report
+from desercion import config, data, eda, evaluate, experiments, final, interpret, plots, report
 from desercion.features import (
     CANDIDATES,
     DROPPED_BY_SELECTION,
@@ -209,7 +210,9 @@ def cmd_compare(args) -> None:
     log.info("\n%s", out.round(4).to_string(index=False))
 
 
-EXPERIMENTS = ["balanceo_arbol", "fuga", "isolation_forest", "vif", "curva_validacion", "costo"]
+EXPERIMENTS = ["balanceo_arbol", "fuga", "isolation_forest", "vif", "curva_validacion", "costo",
+               "sensibilidad"]
+FINAL_MODEL = "LightGBM"
 
 # Curvas de validación: hiperparámetro de complejidad de un modelo de boosting y del SVM.
 CURVES = {"LightGBM": ("clf__num_leaves", [2, 4, 8, 16, 32, 64, 128]),
@@ -238,6 +241,19 @@ def cmd_experiments(args) -> None:
     if "costo" in todo:
         experiments.computational_cost(dev, folds, specs).to_csv(t / "costo_computacional.csv",
                                                                  index=False)
+    if "sensibilidad" in todo:
+        spec = get_specs()[FINAL_MODEL]
+        s_folds, s_oof = experiments.missing_flag_sensitivity(dev, spec)
+        s_folds.to_csv(t / "sensibilidad_pliegues.csv", index=False)
+        s_oof.to_parquet(config.path("processed_dir") / "oof_sensibilidad.parquet")
+        temporal = experiments.temporal_validation(dev, spec)
+        reference = experiments.cohort_reference(s_oof, dev)
+        pd.concat([temporal, reference], ignore_index=True).to_csv(
+            t / "validacion_temporal.csv", index=False)
+        per_fold, curve = experiments.calibration(
+            s_oof[s_oof.variante == experiments.FINAL_VARIANTS[0]])
+        per_fold.to_csv(t / "calibracion.csv", index=False)
+        curve.to_csv(t / "calibracion_curva.csv", index=False)
     log.info("Experimentos listos")
 
 
@@ -304,8 +320,37 @@ def cmd_report(args) -> None:
     log.info("Tablas LaTeX listas en %s", t)
 
 
+def cmd_final(args) -> None:
+    """Ajusta el modelo final con todo el desarrollo, lo evalúa una vez en prueba y lo exporta."""
+    t = _tables()
+    done = t / "test_final.csv"
+    if done.exists() and not args.force:
+        log.warning("El conjunto de prueba ya se evaluó (%s). Para reproducir la evaluación "
+                    "con el mismo modelo congelado, use --force.", done)
+        return
+    df = data.load_clean()
+    split = data.get_split(df)
+    dev = add_engineered(data.study_frame(df, split, "dev"))
+    test = add_engineered(data.study_frame(df, split, "test"))
+    fit = final.fit_final(dev)
+    metrics, by_cohort = final.evaluate_test(fit, test)
+    metrics.to_csv(done, index=False)
+    by_cohort.to_csv(t / "test_por_cohorte.csv", index=False)
+    X_te = test[fit["num"] + fit["cat"]]
+    groups = final.shap_groups(fit["model"], fit["num"], fit["cat"])
+    sv = final.shap_by_variable(fit["model"], X_te, groups)
+    sv.abs().mean().sort_values(ascending=False).rename("shap_abs_medio").to_csv(
+        t / "shap_final_test.csv")
+    pd.DataFrame({"row_id": test.index, "generation": test["generation"].to_numpy(),
+                  "y": test[data.TARGET].to_numpy(),
+                  "score": fit["model"].predict_proba(X_te)[:, 1]}).to_parquet(
+        config.path("processed_dir") / "test_pred.parquet")
+    final.export_artifacts(fit, dev, metrics, config.path("deploy_artifacts"))
+    log.info("Prueba: %s", metrics.set_index("metrica")["valor"].round(3).to_dict())
+
+
 STEPS = ["prepare", "eda", "select", "train", "compare", "experiments", "interpret", "figures",
-         "report"]
+         "report", "final"]
 
 
 def cmd_all(args) -> None:
@@ -326,6 +371,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--sample", type=float, default=None,
                         help="Fracción del conjunto de desarrollo (solo para pruebas rápidas).")
     parser.add_argument("--recompute-split", action="store_true")
+    parser.add_argument("--force", action="store_true",
+                        help="Repite la evaluación en prueba aunque ya exista (mismo modelo).")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",

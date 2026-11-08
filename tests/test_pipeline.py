@@ -56,6 +56,16 @@ def test_preprocessor_learns_only_from_fit_data(xy):
     assert np.allclose(medians, X.iloc[:half][num].astype(float).median().to_numpy(), equal_nan=True)
 
 
+def test_no_indicator_drops_only_the_requested_missing_flag(xy):
+    """Sensibilidad: quitar la marca de faltante de la rúbrica no debe tocar las demás."""
+    X, _, num, cat = xy
+    base = make_preprocessor(num, cat).fit(X).get_feature_names_out()
+    sin = make_preprocessor(num, cat, ("admission.rubric",)).fit(X).get_feature_names_out()
+    assert "missingindicator_admission.rubric" in base
+    assert "missingindicator_admission.rubric" not in sin
+    assert set(base) - set(sin) == {"missingindicator_admission.rubric"}
+
+
 def test_best_threshold_prefers_recall():
     y = np.array([0] * 90 + [1] * 10)
     s = np.r_[np.linspace(0, 0.6, 90), np.linspace(0.4, 1, 10)]

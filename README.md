@@ -11,7 +11,7 @@ latinoamericanos: el *Student Dropout Dataset* del Tecnológico de Monterrey (Al
 |---|---|---|
 | Primera | Comprensión del artículo y planteamiento | [`reports/primera_entrega/`](reports/primera_entrega/primera_entrega.pdf) |
 | Segunda | Datos, modelamiento y validación | [`reports/segunda_entrega/`](reports/segunda_entrega/segunda_entrega.pdf) |
-| Final | Consolidación, despliegue (Streamlit) y comunicación | *pendiente* |
+| Final | Consolidación, despliegue (Streamlit) y comunicación | *en curso* · app en [`deploy/`](deploy/) |
 
 ## Problema
 
@@ -49,6 +49,28 @@ estudiantes con mayor riesgo, CatBoost detecta al 46 % de los desertores.
   proviene del protocolo y no del modelo.
 - **El promedio del primer semestre es el mejor predictor**, como en el artículo.
 
+## Modelo final (Entrega final)
+
+**LightGBM**, que empata con el mejor modelo y es el más barato de ajustar. Antes de abrir el
+conjunto de prueba se pusieron a prueba tres posibles debilidades (`desercion experiments
+--experiments sensibilidad`):
+
+| Pregunta | Resultado | Decisión |
+|---|---|---|
+| ¿La marca de faltante de la rúbrica (solo falta en AD19) actúa como indicador de cohorte? | Quitarla, o añadir la cohorte, cambia el PR-AUC menos de 0,001 | Se quita: en cohortes nuevas la rúbrica siempre está |
+| ¿Generaliza a una cohorte no vista? (entrenar con AD19, evaluar en AD20) | PR-AUC 0,19 frente a 0,22 mezclando cohortes; sigue siendo 2,8 veces el azar | Se reporta como limitación |
+| ¿Las probabilidades están calibradas? | 7,7 % predicho frente a 7,8 % observado; pendiente de calibración 1,04 | La app muestra la probabilidad sin recalibrar |
+
+Evaluación única en el conjunto de prueba sellado (4.843 estudiantes; `desercion final`):
+
+| PR-AUC | ROC-AUC | Recall (umbral F2) | Desertores en el 20 % de mayor riesgo |
+|---|---|---|---|
+| 0,220 (IC 95 %: 0,18–0,26) | 0,708 | 0,64 | 48,5 % |
+
+El desempeño en prueba es coherente con la validación cruzada (PR-AUC 0,247 ± 0,023). La app
+y su despliegue (Docker, Compose, Caddy y Google Cloud) están documentados en
+[`deploy/README.md`](deploy/README.md).
+
 ## Cómo reproducir
 
 **1. Entorno** (Python ≥ 3.11; las versiones de las dependencias están fijadas en `pyproject.toml`):
@@ -84,6 +106,7 @@ o paso a paso:
 | `desercion experiments` | Réplicas del artículo, curvas de validación y costo computacional | `fuga_smote.csv`, `costo_computacional.csv`… |
 | `desercion interpret` | SHAP por pliegue, errores y captura por nivel de riesgo | `shap.csv`, `errores.csv`… |
 | `desercion figures` / `report` | Figuras y tablas LaTeX del informe | `reports/figures/`, `reports/tables/*.tex` |
+| `desercion final` | Modelo final: ajuste con todo el desarrollo, evaluación **única** en prueba y artefactos de la app (si ya se evaluó, exige `--force`) | `test_final.csv`, `deploy/artifacts/` |
 
 Para una prueba rápida: `desercion train --sample 0.1`. Las pruebas automáticas (`pytest`) usan
 datos sintéticos y no requieren el dataset; corren en cada *push* (GitHub Actions).
@@ -94,8 +117,9 @@ SMOTE y cada modelo reciben ese `random_state`, y la CLI fija además las semill
 ## Estructura
 
 ```
-├── configs/config.yaml        # semilla, rutas, validación y métricas
+├── configs/config.yaml        # semilla, rutas, validación, métricas y modelo final
 ├── data/raw/                  # aquí va el Excel del TEC (no se versiona)
+├── deploy/                    # app Streamlit, artefactos del modelo, Docker y guía de despliegue
 ├── notebooks/                 # EDA comentado
 ├── reports/
 │   ├── figures/  tables/      # resultados generados por el flujo (CSV, PNG, tablas LaTeX)
@@ -106,7 +130,8 @@ SMOTE y cada modelo reciben ese `random_state`, y la CLI fija además las semill
 │   ├── features.py            # variables, exclusiones, variables construidas y preprocesamiento
 │   ├── models.py              # modelos, rejillas y Pipeline (preprocesamiento → balanceo → modelo)
 │   ├── evaluate.py            # CV anidada, umbral F2, métricas y pruebas estadísticas
-│   ├── experiments.py         # selección, réplicas del artículo, curvas de validación y costo
+│   ├── experiments.py         # selección, réplicas del artículo, curvas, costo y sensibilidad
+│   ├── final.py               # modelo final, evaluación en prueba y artefactos de la app
 │   ├── interpret.py           # SHAP y análisis de errores
 │   ├── plots.py · report.py   # figuras y tablas del informe
 │   └── cli.py                 # punto de entrada (`desercion <paso>`)

@@ -8,6 +8,7 @@
 6. ``vif``                       – multicolinealidad que llevó al artículo a descartar la RL.
 7. ``validation_curve``          – desempeño en entrenamiento y validación según un hiperparámetro.
 8. ``computational_cost``        – tiempos de búsqueda, ajuste y predicción, y tamaño del modelo.
+9. Sensibilidad del modelo final – marcas de faltante, validación temporal y calibración.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import os
 import pickle
 import platform
 import time
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -26,15 +28,33 @@ from sklearn.base import clone
 from sklearn.ensemble import IsolationForest
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, f1_score, recall_score, roc_auc_score
-from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
+from sklearn.metrics import (
+    average_precision_score,
+    brier_score_loss,
+    f1_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedGroupKFold,
+    StratifiedKFold,
+    cross_val_predict,
+)
 from sklearn.tree import DecisionTreeClassifier
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from desercion import config
 from desercion.data import GROUP, TARGET
+from desercion.evaluate import best_threshold, binary_metrics, nested_cv
 from desercion.features import ENGINEERED, feature_lists, make_preprocessor
-from desercion.models import ModelSpec, build_pipeline, params_from_text, tuned_pipeline
+from desercion.models import (
+    ModelSpec,
+    build_pipeline,
+    params_from_text,
+    params_to_text,
+    tuned_pipeline,
+)
 
 log = logging.getLogger(__name__)
 
@@ -299,3 +319,121 @@ def computational_cost(dev: pd.DataFrame, folds: pd.DataFrame, specs: dict[str, 
                      "nucleos": os.cpu_count(), "procesador": platform.processor()})
         log.info("Costo | %s: ajuste %.1fs", name, rows[-1]["ajuste_s"])
     return pd.DataFrame(rows)
+
+
+# --------------------------------------------- 9. Sensibilidad del modelo final
+FINAL_VARIANTS = ("Base (Segunda entrega)", "Sin marca de faltante de la rúbrica",
+                  "Sin marcas de faltante", "Con la cohorte como variable")
+
+
+def _final_variant(spec: ModelSpec, name: str) -> tuple[ModelSpec, list[str], list[str]]:
+    """Variantes del modelo final para poner a prueba el papel de los datos faltantes.
+
+    La rúbrica de admisión solo falta en AD19 (45 %) y nunca en AD20, por lo que su marca de
+    faltante podría funcionar como indicador de cohorte. Se compara el modelo base con uno sin
+    esa marca, uno sin ninguna marca y uno que recibe la cohorte de forma explícita.
+    """
+    num, cat = feature_lists()
+    if name == "Sin marca de faltante de la rúbrica":
+        return replace(spec, no_indicator=("admission.rubric",)), num, cat
+    if name == "Sin marcas de faltante":
+        return replace(spec, no_indicator=tuple(num)), num, cat
+    if name == "Con la cohorte como variable":
+        return spec, num, cat + ["generation"]
+    return spec, num, cat
+
+
+def missing_flag_sensitivity(dev: pd.DataFrame, spec: ModelSpec,
+                             variants=FINAL_VARIANTS) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """CV anidada (misma rejilla y protocolo que la comparación de modelos) de cada variante."""
+    folds, oofs = [], []
+    for name in variants:
+        s, num, cat = _final_variant(spec, name)
+        f, o = nested_cv(s, dev[num + cat], dev[TARGET], dev[GROUP], num, cat)
+        folds.append(f.assign(variante=name))
+        oofs.append(o.assign(variante=name))
+        log.info("Sensibilidad | %s: PR-AUC %.3f", name, f["pr_auc"].mean())
+    return pd.concat(folds, ignore_index=True), pd.concat(oofs, ignore_index=True)
+
+
+def _capture(y: np.ndarray, s: np.ndarray, frac: float = 0.20) -> float:
+    top = np.argsort(-s, kind="stable")[: int(round(frac * len(s)))]
+    return float(y[top].sum() / y.sum())
+
+
+def temporal_validation(dev: pd.DataFrame, spec: ModelSpec,
+                        variants=FINAL_VARIANTS[:2]) -> pd.DataFrame:
+    """Entrena con una cohorte y evalúa en la otra (AD19 -> AD20 es el uso real del modelo).
+
+    Dentro de la cohorte de entrenamiento se repite el protocolo de la CV anidada: rejilla con
+    CV interna agrupada y umbral F2 con predicciones fuera de pliegue. La cohorte evaluada
+    nunca interviene en esas decisiones.
+    """
+    cfg, seed = config.load_config(), config.seed()
+    beta = cfg["metrics"]["threshold_beta"]
+    rows = []
+    for gen_tr, gen_te in (("AD19", "AD20"), ("AD20", "AD19")):
+        tr, te = dev[dev["generation"] == gen_tr], dev[dev["generation"] == gen_te]
+        for name in variants:
+            s, num, cat = _final_variant(spec, name)
+            search = GridSearchCV(build_pipeline(s, num, cat), s.grid,
+                                  scoring=cfg["metrics"]["tuning"],
+                                  cv=_outer(seed + 1, cfg["cv"]["inner_folds"]),
+                                  n_jobs=s.search_n_jobs, refit=True, error_score="raise")
+            search.fit(tr[num + cat], tr[TARGET], groups=tr[GROUP])
+            model = search.best_estimator_
+            oof = cross_val_predict(clone(model), tr[num + cat], tr[TARGET], groups=tr[GROUP],
+                                    cv=_outer(seed + 2, cfg["cv"]["threshold_folds"]),
+                                    method="predict_proba")[:, 1]
+            thr = best_threshold(tr[TARGET].to_numpy(), oof, beta)
+            y, sc = te[TARGET].to_numpy(), model.predict_proba(te[num + cat])[:, 1]
+            m = binary_metrics(y, sc, (sc >= thr).astype(int), beta)
+            rows.append({"esquema": "Temporal", "entrena": gen_tr, "evalua": gen_te,
+                         "variante": name, "n_entrena": len(tr), "n_evalua": len(te),
+                         "prevalencia": y.mean(), **m, "pr_auc_sobre_azar": m["pr_auc"] / y.mean(),
+                         "captura_top20": _capture(y, sc), "prob_media": sc.mean(),
+                         "params": params_to_text(search.best_params_)})
+            log.info("Temporal | %s -> %s | %s: PR-AUC %.3f", gen_tr, gen_te, name, m["pr_auc"])
+    return pd.DataFrame(rows)
+
+
+def cohort_reference(oof: pd.DataFrame, dev: pd.DataFrame) -> pd.DataFrame:
+    """Las mismas métricas, por cohorte, de la CV anidada que mezcla AD19 y AD20 (referencia)."""
+    oof = oof.assign(generation=dev.loc[oof["row_id"], "generation"].to_numpy())
+    rows = []
+    for (name, gen), d in oof.groupby(["variante", "generation"], sort=False):
+        y, sc = d["y"].to_numpy(), d["score"].to_numpy()
+        pr = average_precision_score(y, sc)
+        rows.append({"esquema": "CV mezclando cohortes", "evalua": gen, "variante": name,
+                     "n_evalua": len(d), "prevalencia": y.mean(), "pr_auc": pr,
+                     "roc_auc": roc_auc_score(y, sc), "recall": recall_score(y, d["pred"]),
+                     "pr_auc_sobre_azar": pr / y.mean(), "captura_top20": _capture(y, sc),
+                     "prob_media": sc.mean()})
+    return pd.DataFrame(rows)
+
+
+def calibration(oof: pd.DataFrame, bins: int = 10) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """¿Las probabilidades significan lo que dicen? Puntaje de Brier y curva de calibración.
+
+    Por pliegue: Brier del modelo frente al de predecir siempre la tasa base, probabilidad media
+    frente a tasa observada, y pendiente e intercepto de calibración (regresión logística de y
+    sobre logit(p); lo ideal es pendiente 1 e intercepto 0). La curva agrupa las predicciones
+    fuera de pliegue en deciles de probabilidad.
+    """
+    from desercion.eda import wilson
+
+    rows = []
+    for k, d in oof.groupby("pliegue"):
+        y, p = d["y"].to_numpy(), np.clip(d["score"].to_numpy(), 1e-6, 1 - 1e-6)
+        logit = np.log(p / (1 - p)).reshape(-1, 1)
+        lr = LogisticRegression(penalty=None).fit(logit, y)
+        rows.append({"pliegue": k, "brier": brier_score_loss(y, p),
+                     "brier_tasa_base": y.mean() * (1 - y.mean()), "prob_media": p.mean(),
+                     "tasa_observada": y.mean(), "pendiente": lr.coef_[0, 0],
+                     "intercepto": lr.intercept_[0]})
+    per_fold = pd.DataFrame(rows)
+    d = oof.assign(bin=pd.qcut(oof["score"], bins, labels=False, duplicates="drop"))
+    curve = d.groupby("bin").agg(prob_media=("score", "mean"), tasa_observada=("y", "mean"),
+                                 desertores=("y", "sum"), n=("y", "size")).reset_index()
+    curve["ic_bajo"], curve["ic_alto"] = wilson(curve["desertores"], curve["n"])
+    return per_fold, curve

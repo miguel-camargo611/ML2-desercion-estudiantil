@@ -79,6 +79,8 @@ class ModelSpec:
     grid: dict[str, list[Any]] = field(default_factory=dict)
     native_categoricals: bool = False
     search_n_jobs: int = 1
+    # Numéricas que se imputan sin la columna indicadora de faltante (análisis de sensibilidad).
+    no_indicator: tuple[str, ...] = ()
 
 
 def _balance(seed: int) -> dict[str, list[Any]]:
@@ -156,7 +158,7 @@ def build_pipeline(spec: ModelSpec, num: list[str], cat: list[str], seed: int | 
     El paso ``sampler`` existe siempre para que la rejilla pueda activarlo o no.
     """
     prep = (make_native_preprocessor(num, cat) if spec.native_categoricals
-            else make_preprocessor(num, cat))
+            else make_preprocessor(num, cat, spec.no_indicator))
     return ImbPipeline([("prep", prep), ("sampler", sampler), ("clf", clone(spec.estimator))])
 
 

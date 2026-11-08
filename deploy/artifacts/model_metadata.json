@@ -1,0 +1,628 @@
+{
+  "model_name": "LightGBM — riesgo de deserción al terminar el 1.er semestre",
+  "model_version": "1.0.0",
+  "trained_at_utc": "2026-11-08T03:16:05+00:00",
+  "dataset": "Student Dropout Dataset, Tec de Monterrey (cohortes AD19–AD20, pregrado)",
+  "target": "desercion (1 = ya no está matriculado al cerrar el primer año)",
+  "positive_class": 1,
+  "feature_order": [
+    "age",
+    "scholarship.perc",
+    "loan.perc",
+    "PNA",
+    "admission.test",
+    "admission.rubric",
+    "general.math.eval",
+    "english.evaluation",
+    "FTE",
+    "average.first.period",
+    "failed.subject.first.period",
+    "dropped.subject.first.period",
+    "brecha.promedio",
+    "gender",
+    "max.degree.parents",
+    "father.education.summary",
+    "mother.education.summary",
+    "parents.exatec",
+    "school.cost",
+    "scholarship.type",
+    "school",
+    "program",
+    "region"
+  ],
+  "input_features": [
+    "age",
+    "scholarship.perc",
+    "loan.perc",
+    "PNA",
+    "admission.test",
+    "admission.rubric",
+    "general.math.eval",
+    "english.evaluation",
+    "FTE",
+    "average.first.period",
+    "failed.subject.first.period",
+    "dropped.subject.first.period",
+    "gender",
+    "max.degree.parents",
+    "father.education.summary",
+    "mother.education.summary",
+    "parents.exatec",
+    "school.cost",
+    "scholarship.type",
+    "school",
+    "program",
+    "region"
+  ],
+  "engineered": {
+    "brecha.promedio": "average.first.period - PNA"
+  },
+  "input_contract": {
+    "age": {
+      "type": "numeric",
+      "label": "Edad",
+      "minimum": 16.0,
+      "maximum": 54.0,
+      "default": 18.0,
+      "integer": true,
+      "allow_missing": false
+    },
+    "scholarship.perc": {
+      "type": "numeric",
+      "label": "% de beca",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0,
+      "integer": false,
+      "allow_missing": false
+    },
+    "loan.perc": {
+      "type": "numeric",
+      "label": "% de crédito",
+      "minimum": 0.0,
+      "maximum": 0.45,
+      "default": 0.0,
+      "integer": false,
+      "allow_missing": false
+    },
+    "PNA": {
+      "type": "numeric",
+      "label": "Promedio de bachillerato",
+      "minimum": 66.0,
+      "maximum": 100.0,
+      "default": 88.31,
+      "integer": false,
+      "allow_missing": false
+    },
+    "admission.test": {
+      "type": "numeric",
+      "label": "Examen de admisión (presencial)",
+      "minimum": 600.0,
+      "maximum": 1590.0,
+      "default": 1360.0,
+      "integer": true,
+      "allow_missing": true
+    },
+    "admission.rubric": {
+      "type": "numeric",
+      "label": "Rúbrica de admisión",
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "default": 36.0,
+      "integer": true,
+      "allow_missing": true
+    },
+    "general.math.eval": {
+      "type": "numeric",
+      "label": "Nota de matemáticas (admisión)",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 50.0,
+      "integer": false,
+      "allow_missing": false
+    },
+    "english.evaluation": {
+      "type": "numeric",
+      "label": "Nivel de inglés",
+      "minimum": 1.0,
+      "maximum": 7.0,
+      "default": 6.0,
+      "integer": true,
+      "allow_missing": false
+    },
+    "FTE": {
+      "type": "numeric",
+      "label": "Carga académica",
+      "minimum": 0.06,
+      "maximum": 1.28,
+      "default": 1.0,
+      "integer": false,
+      "allow_missing": false
+    },
+    "average.first.period": {
+      "type": "numeric",
+      "label": "Promedio del 1.er semestre",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 91.0,
+      "integer": false,
+      "allow_missing": false
+    },
+    "failed.subject.first.period": {
+      "type": "numeric",
+      "label": "Materias reprobadas (1.er sem.)",
+      "minimum": 0.0,
+      "maximum": 5.0,
+      "default": 0.0,
+      "integer": true,
+      "allow_missing": false
+    },
+    "dropped.subject.first.period": {
+      "type": "numeric",
+      "label": "Materias retiradas (1.er sem.)",
+      "minimum": 0.0,
+      "maximum": 9.0,
+      "default": 0.0,
+      "integer": true,
+      "allow_missing": false
+    },
+    "gender": {
+      "type": "categorical",
+      "label": "Género",
+      "categories": [
+        "Male",
+        "Female"
+      ],
+      "default": "Male"
+    },
+    "max.degree.parents": {
+      "type": "categorical",
+      "label": "Máximo grado de los padres",
+      "categories": [
+        "Undergraduate degree",
+        "Master degree",
+        "No degree",
+        "PhD",
+        "No information"
+      ],
+      "default": "Undergraduate degree"
+    },
+    "father.education.summary": {
+      "type": "categorical",
+      "label": "Educación del padre",
+      "categories": [
+        "Undergraduate degree",
+        "Master degree",
+        "No degree",
+        "PhD",
+        "No information"
+      ],
+      "default": "Undergraduate degree"
+    },
+    "mother.education.summary": {
+      "type": "categorical",
+      "label": "Educación de la madre",
+      "categories": [
+        "Undergraduate degree",
+        "No degree",
+        "Master degree",
+        "No information",
+        "PhD"
+      ],
+      "default": "Undergraduate degree"
+    },
+    "parents.exatec": {
+      "type": "categorical",
+      "label": "Padres exalumnos del Tec",
+      "categories": [
+        "No",
+        "Yes",
+        "No information"
+      ],
+      "default": "No"
+    },
+    "school.cost": {
+      "type": "categorical",
+      "label": "Costo del colegio de origen",
+      "categories": [
+        "High cost",
+        "Medium cost",
+        "Medium high cost",
+        "Not defined",
+        "Public",
+        "Low cost"
+      ],
+      "default": "High cost"
+    },
+    "scholarship.type": {
+      "type": "categorical",
+      "label": "Tipo de beca",
+      "categories": [
+        "No scholarship",
+        "Traditional",
+        "Academic talent",
+        "Sports talent",
+        "Child of Professor/Employee/Director",
+        "Leaders of Tomorrow Scholarship",
+        "Leadership talent",
+        "Cultural talent",
+        "Army/Navy scholarship",
+        "Enterpreneurial talent"
+      ],
+      "default": "No scholarship"
+    },
+    "school": {
+      "type": "categorical",
+      "label": "Escuela",
+      "categories": [
+        "EIC",
+        "EN",
+        "EHE-EAAD",
+        "ECSG",
+        "EMCS",
+        "EAAD-Engineering and Sciences"
+      ],
+      "default": "EIC"
+    },
+    "program": {
+      "type": "categorical",
+      "label": "Programa",
+      "categories": [
+        "NEG",
+        "IIT",
+        "ESC",
+        "IBQ",
+        "CIS",
+        "ICT",
+        "ICI",
+        "SLD",
+        "AMC",
+        "MC",
+        "LAF",
+        "CPF",
+        "LDF",
+        "IMA",
+        "LAE",
+        "LEC",
+        "LNB",
+        "IIS",
+        "ITS",
+        "LRI",
+        "IME"
+      ],
+      "default": "NEG"
+    },
+    "region": {
+      "type": "categorical",
+      "label": "Región del campus",
+      "categories": [
+        "RM",
+        "RCM",
+        "RCS",
+        "RO",
+        "DR"
+      ],
+      "default": "RM"
+    }
+  },
+  "decision_threshold": 0.07203378812879042,
+  "hyperparameters": "{'clf__learning_rate': 0.02, 'clf__min_child_samples': 100, 'clf__num_leaves': 8, 'sampler': 'passthrough'}",
+  "metrics": {
+    "pr_auc": 0.2201,
+    "roc_auc": 0.7084,
+    "recall": 0.6403,
+    "precision": 0.1337,
+    "captura_top20": 0.485,
+    "prevalencia": 0.0758
+  },
+  "risk_percentiles": [
+    0.01601,
+    0.018317,
+    0.019988,
+    0.021219,
+    0.022321,
+    0.023295,
+    0.024123,
+    0.024976,
+    0.025787,
+    0.026573,
+    0.027233,
+    0.027858,
+    0.028549,
+    0.029256,
+    0.029927,
+    0.030523,
+    0.031208,
+    0.031939,
+    0.032613,
+    0.03321,
+    0.033837,
+    0.03455,
+    0.035233,
+    0.035917,
+    0.036514,
+    0.037158,
+    0.037832,
+    0.038481,
+    0.039237,
+    0.040066,
+    0.040765,
+    0.041451,
+    0.042192,
+    0.042839,
+    0.043558,
+    0.044334,
+    0.045063,
+    0.045842,
+    0.046522,
+    0.047299,
+    0.048268,
+    0.049046,
+    0.049933,
+    0.050737,
+    0.051578,
+    0.052362,
+    0.053295,
+    0.054214,
+    0.055081,
+    0.055989,
+    0.056937,
+    0.057865,
+    0.058896,
+    0.059808,
+    0.060757,
+    0.061807,
+    0.062866,
+    0.063957,
+    0.065098,
+    0.066183,
+    0.067265,
+    0.068439,
+    0.06965,
+    0.070917,
+    0.072152,
+    0.073466,
+    0.074894,
+    0.076222,
+    0.077689,
+    0.079233,
+    0.081009,
+    0.082652,
+    0.084319,
+    0.085974,
+    0.087968,
+    0.090095,
+    0.092101,
+    0.094497,
+    0.097013,
+    0.099655,
+    0.102671,
+    0.105491,
+    0.108786,
+    0.111959,
+    0.115645,
+    0.119754,
+    0.123976,
+    0.129149,
+    0.135825,
+    0.141831,
+    0.148954,
+    0.157871,
+    0.168954,
+    0.181947,
+    0.197182,
+    0.221455,
+    0.252114,
+    0.30806,
+    0.417331
+  ],
+  "global_importance": [
+    {
+      "feature": "average.first.period",
+      "label": "Promedio del 1.er semestre",
+      "importance": 0.25190759243979466
+    },
+    {
+      "feature": "scholarship.perc",
+      "label": "% de beca",
+      "importance": 0.2412757259131008
+    },
+    {
+      "feature": "PNA",
+      "label": "Promedio de bachillerato",
+      "importance": 0.12089179851690676
+    },
+    {
+      "feature": "region",
+      "label": "Región del campus",
+      "importance": 0.10200024036834558
+    },
+    {
+      "feature": "school",
+      "label": "Escuela",
+      "importance": 0.07741134395750807
+    },
+    {
+      "feature": "father.education.summary",
+      "label": "Educación del padre",
+      "importance": 0.07302728486328687
+    },
+    {
+      "feature": "age",
+      "label": "Edad",
+      "importance": 0.06935360118350459
+    },
+    {
+      "feature": "program",
+      "label": "Programa",
+      "importance": 0.061373994645836594
+    },
+    {
+      "feature": "brecha.promedio",
+      "label": "Brecha promedio 1.er sem. − bachillerato",
+      "importance": 0.05074258705981648
+    },
+    {
+      "feature": "general.math.eval",
+      "label": "Nota de matemáticas (admisión)",
+      "importance": 0.05011646776272546
+    },
+    {
+      "feature": "admission.test",
+      "label": "Examen de admisión (presencial)",
+      "importance": 0.04721524414439067
+    },
+    {
+      "feature": "school.cost",
+      "label": "Costo del colegio de origen",
+      "importance": 0.04577041336600286
+    },
+    {
+      "feature": "FTE",
+      "label": "Carga académica",
+      "importance": 0.0428372340363746
+    },
+    {
+      "feature": "admission.rubric",
+      "label": "Rúbrica de admisión",
+      "importance": 0.038829020145320026
+    },
+    {
+      "feature": "gender",
+      "label": "Género",
+      "importance": 0.038338577817196025
+    },
+    {
+      "feature": "max.degree.parents",
+      "label": "Máximo grado de los padres",
+      "importance": 0.032664888577018575
+    },
+    {
+      "feature": "english.evaluation",
+      "label": "Nivel de inglés",
+      "importance": 0.026207473771881762
+    },
+    {
+      "feature": "mother.education.summary",
+      "label": "Educación de la madre",
+      "importance": 0.01976853598707499
+    },
+    {
+      "feature": "scholarship.type",
+      "label": "Tipo de beca",
+      "importance": 0.01893150845284849
+    },
+    {
+      "feature": "dropped.subject.first.period",
+      "label": "Materias retiradas (1.er sem.)",
+      "importance": 0.008997104692805676
+    },
+    {
+      "feature": "parents.exatec",
+      "label": "Padres exalumnos del Tec",
+      "importance": 0.0068253592704634715
+    },
+    {
+      "feature": "loan.perc",
+      "label": "% de crédito",
+      "importance": 0.006530972211356352
+    },
+    {
+      "feature": "failed.subject.first.period",
+      "label": "Materias reprobadas (1.er sem.)",
+      "importance": 0.005085118197392332
+    }
+  ],
+  "shap_groups": {
+    "age": "age",
+    "scholarship.perc": "scholarship.perc",
+    "loan.perc": "loan.perc",
+    "PNA": "PNA",
+    "admission.test": "admission.test",
+    "general.math.eval": "general.math.eval",
+    "english.evaluation": "english.evaluation",
+    "FTE": "FTE",
+    "average.first.period": "average.first.period",
+    "failed.subject.first.period": "failed.subject.first.period",
+    "dropped.subject.first.period": "dropped.subject.first.period",
+    "brecha.promedio": "brecha.promedio",
+    "missingindicator_PNA": "PNA",
+    "missingindicator_admission.test": "admission.test",
+    "missingindicator_brecha.promedio": "brecha.promedio",
+    "admission.rubric": "admission.rubric",
+    "gender_Female": "gender",
+    "gender_Male": "gender",
+    "max.degree.parents_Master degree": "max.degree.parents",
+    "max.degree.parents_No degree": "max.degree.parents",
+    "max.degree.parents_No information": "max.degree.parents",
+    "max.degree.parents_PhD": "max.degree.parents",
+    "max.degree.parents_Undergraduate degree": "max.degree.parents",
+    "father.education.summary_Master degree": "father.education.summary",
+    "father.education.summary_No degree": "father.education.summary",
+    "father.education.summary_No information": "father.education.summary",
+    "father.education.summary_PhD": "father.education.summary",
+    "father.education.summary_Undergraduate degree": "father.education.summary",
+    "mother.education.summary_Master degree": "mother.education.summary",
+    "mother.education.summary_No degree": "mother.education.summary",
+    "mother.education.summary_No information": "mother.education.summary",
+    "mother.education.summary_PhD": "mother.education.summary",
+    "mother.education.summary_Undergraduate degree": "mother.education.summary",
+    "parents.exatec_No": "parents.exatec",
+    "parents.exatec_No information": "parents.exatec",
+    "parents.exatec_Yes": "parents.exatec",
+    "school.cost_High cost": "school.cost",
+    "school.cost_Low cost": "school.cost",
+    "school.cost_Medium cost": "school.cost",
+    "school.cost_Medium high cost": "school.cost",
+    "school.cost_Not defined": "school.cost",
+    "school.cost_Public": "school.cost",
+    "scholarship.type_Academic talent": "scholarship.type",
+    "scholarship.type_Army/Navy scholarship": "scholarship.type",
+    "scholarship.type_Child of Professor/Employee/Director": "scholarship.type",
+    "scholarship.type_Cultural talent": "scholarship.type",
+    "scholarship.type_Enterpreneurial talent": "scholarship.type",
+    "scholarship.type_Leaders of Tomorrow Scholarship": "scholarship.type",
+    "scholarship.type_Leadership talent": "scholarship.type",
+    "scholarship.type_No scholarship": "scholarship.type",
+    "scholarship.type_Sports talent": "scholarship.type",
+    "scholarship.type_Traditional": "scholarship.type",
+    "school_EAAD-Engineering and Sciences": "school",
+    "school_ECSG": "school",
+    "school_EHE-EAAD": "school",
+    "school_EIC": "school",
+    "school_EMCS": "school",
+    "school_EN": "school",
+    "program_AMC": "program",
+    "program_CIS": "program",
+    "program_ESC": "program",
+    "program_IBQ": "program",
+    "program_ICI": "program",
+    "program_ICT": "program",
+    "program_IIT": "program",
+    "program_MC": "program",
+    "program_NEG": "program",
+    "program_SLD": "program",
+    "program_infrequent_sklearn": "program",
+    "region_DR": "region",
+    "region_RCM": "region",
+    "region_RCS": "region",
+    "region_RM": "region",
+    "region_RO": "region"
+  },
+  "limitations": [
+    "Demostración académica: no usar para decisiones sobre estudiantes reales sin validación institucional.",
+    "La señal es débil (ROC-AUC ≈ 0,7): la alerta prioriza a quién acompañar, no diagnostica a un estudiante.",
+    "Entrenado con AD19–AD20; en una cohorte nueva el desempeño baja algo y el nivel de las probabilidades puede correrse (validación temporal AD19 → AD20).",
+    "La explicación SHAP describe cómo decide el modelo; no implica causalidad.",
+    "Los rangos de las entradas son los del entrenamiento: valores fuera de ellos no están respaldados por los datos."
+  ],
+  "runtime": {
+    "python": "3.13.14",
+    "scikit_learn": "1.9.1",
+    "imbalanced_learn": "0.14.2",
+    "lightgbm": "4.7.0",
+    "pandas": "3.0.6",
+    "numpy": "2.5.3",
+    "shap": "0.52.0"
+  }
+}

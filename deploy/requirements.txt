@@ -1,0 +1,11 @@
+# Mismas versiones con las que se entrenó el modelo (pyproject.toml): paridad entre entornos.
+streamlit==1.66.1
+pandas==3.0.6
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+imbalanced-learn==0.14.2
+lightgbm==4.7.0
+shap==0.52.0
+joblib==1.6.0
+openpyxl==3.1.5   # lectura de Excel en la carga masiva

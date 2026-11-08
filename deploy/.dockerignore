@@ -1,0 +1,14 @@
+# Contexto mínimo: solo app/, artifacts/ y requirements.txt llegan a la imagen.
+.git
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pem
+*.key
+.env
+tests
+data
+*.xlsx
+*.parquet
+README.md
