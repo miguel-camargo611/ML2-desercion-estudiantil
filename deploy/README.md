@@ -58,21 +58,34 @@ El repositorio ya trae lo que Community Cloud necesita cuando la app no está en
 | `.streamlit/config.toml` (raíz) | Community Cloud solo lee la configuración desde la raíz. Es copia de `deploy/.streamlit/config.toml` (una prueba verifica que coincidan). |
 | `packages.txt` (raíz) | `libgomp1`, biblioteca del sistema que necesita LightGBM. |
 
+**Repositorio de publicación.** Community Cloud permite una sola app privada por cuenta, y
+una app desplegada desde un repo privado nace privada. Por eso la app se publica desde
+[`miguel-camargo611/desercion-app`](https://github.com/miguel-camargo611/desercion-app), un
+repo **público** que solo contiene `app/`, `artifacts/`, `.streamlit/config.toml`,
+`packages.txt` y una README: ni datos, ni informes, ni el resto del código. Este repositorio
+sigue privado y es la fuente de verdad.
+
 Pasos:
 
-1. Entrar a [share.streamlit.io](https://share.streamlit.io) con la cuenta de GitHub dueña del repositorio y autorizar el acceso a repositorios privados.
-2. **Create app → Deploy a public app from GitHub** (aunque el repo sea privado):
-   - Repository: `miguel-camargo611/ML2-desercion-estudiantil` · Branch: `main`
-   - Main file path: `deploy/app/main.py`
+1. Entrar a [share.streamlit.io](https://share.streamlit.io) con la cuenta de GitHub `miguel-camargo611`.
+2. **Create app → Deploy a public app from GitHub**:
+   - Repository: `miguel-camargo611/desercion-app` · Branch: `main`
+   - Main file path: `app/main.py`
    - App URL: un subdominio corto, p. ej. `desercion-tec`
 3. **Advanced settings → Python 3.13** (la versión con la que se serializó el modelo). No hay secretos.
 4. **Deploy** y esperar la instalación (unos minutos; el registro se ve en *Manage app*).
-5. **Compartir:** como el repositorio es privado, la app nace privada. Desde **Share**, invitar
-   el correo del profesor o, si la opción está disponible, hacerla pública: la app no contiene
-   datos de estudiantes, solo el modelo y su contrato.
 
-Cada `push` a `main` redespliega la app automáticamente. Simulación local equivalente (entorno
-limpio, lanzado desde la raíz como lo hace Community Cloud):
+**Actualizar la app** tras cambiar `deploy/` (cada `push` al repo de publicación la redespliega):
+
+```bash
+# desde la raíz de este repositorio, con un clon de desercion-app al lado
+cp deploy/app/{main.py,model_service.py,theme.py,charts.py,requirements.txt} ../desercion-app/app/
+cp deploy/artifacts/* ../desercion-app/artifacts/
+cp .streamlit/config.toml ../desercion-app/.streamlit/ && cp packages.txt ../desercion-app/
+cd ../desercion-app && git add -A && git commit -m "Actualiza la app" && git push
+```
+
+Simulación local equivalente a Community Cloud (entorno limpio, lanzado desde la raíz):
 
 ```bash
 python -m venv .cloudenv && .cloudenv/Scripts/pip install -r deploy/app/requirements.txt
