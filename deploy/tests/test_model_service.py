@@ -125,3 +125,10 @@ def test_risk_tiers_follow_threshold_and_top20(bundle) -> None:
     assert risk_tier(p80, metadata) == "Alto"
     assert risk_tier((thr + p80) / 2, metadata) == "Medio"
     assert risk_tier(thr / 2, metadata) == "Bajo"
+
+
+def test_streamlit_config_is_the_same_for_docker_and_community_cloud() -> None:
+    """Community Cloud lee .streamlit/ de la raíz; Docker, el de deploy/. Deben coincidir."""
+    root = PROJECT.parent / ".streamlit" / "config.toml"
+    local = PROJECT / ".streamlit" / "config.toml"
+    assert root.read_text(encoding="utf-8") == local.read_text(encoding="utf-8")

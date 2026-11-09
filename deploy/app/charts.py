@@ -15,9 +15,9 @@ def _style(chart: alt.Chart, height: int) -> alt.Chart:
     return (chart.properties(height=height, background="transparent")
             .configure_view(strokeWidth=0)
             .configure_axis(labelFont=FONT, titleFont=FONT, labelColor=INK_2, titleColor=INK_3,
-                            labelFontSize=12, titleFontSize=11, labelLimit=240, gridColor="#ece8f6",
+                            labelFontSize=12, titleFontSize=11, labelLimit=190, gridColor="#ece8f6",
                             domainColor="#ddd7ee", tickColor="#ddd7ee")
-            .configure_legend(labelFont=FONT, titleFont=FONT, labelColor=INK_2,
+            .configure_legend(labelFont=FONT, titleFont=FONT, labelColor=INK_2, labelLimit=0,
                               titleColor=INK_3, orient="bottom", symbolType="circle")
             .configure_text(font=FONT))
 
@@ -47,11 +47,13 @@ def shap_bars(local: pd.DataFrame) -> alt.Chart:
     d["efecto"] = d["aporte_shap"].map(lambda v: "Sube el riesgo" if v > 0 else "Baja el riesgo")
     d["orden"] = range(len(d))
     bars = alt.Chart(d).mark_bar(cornerRadiusEnd=4, height=16).encode(
-        x=alt.X("aporte_shap:Q", title="Aporte al riesgo (SHAP, log-odds)",
+        x=alt.X("aporte_shap:Q", title="Aporte al riesgo (SHAP)",
                 axis=alt.Axis(tickCount=5)),
         y=alt.Y("etiqueta:N", sort=alt.EncodingSortField("orden"), title=None),
         color=alt.Color("efecto:N", scale=alt.Scale(domain=["Sube el riesgo", "Baja el riesgo"],
-                                                    range=[UP, DOWN]), title=None),
+                                                    range=[UP, DOWN]), title=None,
+                        # Leyenda en columna: con etiquetas largas el área del gráfico es angosta.
+                        legend=alt.Legend(orient="bottom", direction="vertical")),
         tooltip=[alt.Tooltip("etiqueta:N", title="Variable"),
                  alt.Tooltip("aporte_shap:Q", title="Aporte", format="+.3f"),
                  alt.Tooltip("efecto:N", title="Efecto")])

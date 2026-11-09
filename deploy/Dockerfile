@@ -15,7 +15,7 @@ RUN apt-get update \
 RUN groupadd --system appuser \
     && useradd --system --gid appuser --create-home appuser
 
-COPY requirements.txt .
+COPY app/requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY .streamlit/ .streamlit/

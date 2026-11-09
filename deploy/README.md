@@ -16,7 +16,7 @@ deploy/
 │   ├── model_metadata.json      # contrato: orden y rangos de variables, umbral, versión, métricas
 │   └── reference_prediction.json# perfil FICTICIO y su probabilidad (prueba de paridad)
 ├── tests/                   # contrato, paridad, validación y carga masiva
-├── Dockerfile  compose.yaml  Caddyfile  .env.example  .dockerignore  requirements.txt
+├── Dockerfile  compose.yaml  Caddyfile  .env.example  .dockerignore
 ```
 
 ## Contrato
@@ -33,7 +33,7 @@ deploy/
 
 ```bash
 # Sin Docker (desde la raíz del repositorio, con el entorno del proyecto)
-pip install streamlit==1.66.1
+pip install -r deploy/app/requirements.txt
 pytest deploy/tests
 cd deploy && streamlit run app/main.py          # http://localhost:8501
 
@@ -48,7 +48,38 @@ docker compose down
 Para regenerar los artefactos tras cambiar el modelo: `desercion final --force` en la raíz
 (reproduce el mismo modelo con la semilla 42 y vuelve a escribir `artifacts/`).
 
-## 2. Desplegar en Google Cloud
+## 2. Desplegar en Streamlit Community Cloud (opción usada en la entrega)
+
+El repositorio ya trae lo que Community Cloud necesita cuando la app no está en la raíz:
+
+| Archivo | Por qué |
+|---|---|
+| `deploy/app/requirements.txt` | Community Cloud busca las dependencias primero en la carpeta del archivo principal; así no instala el `pyproject.toml` de la raíz (todo el proyecto). Docker usa este mismo archivo. |
+| `.streamlit/config.toml` (raíz) | Community Cloud solo lee la configuración desde la raíz. Es copia de `deploy/.streamlit/config.toml` (una prueba verifica que coincidan). |
+| `packages.txt` (raíz) | `libgomp1`, biblioteca del sistema que necesita LightGBM. |
+
+Pasos:
+
+1. Entrar a [share.streamlit.io](https://share.streamlit.io) con la cuenta de GitHub dueña del repositorio y autorizar el acceso a repositorios privados.
+2. **Create app → Deploy a public app from GitHub** (aunque el repo sea privado):
+   - Repository: `miguel-camargo611/ML2-desercion-estudiantil` · Branch: `main`
+   - Main file path: `deploy/app/main.py`
+   - App URL: un subdominio corto, p. ej. `desercion-tec`
+3. **Advanced settings → Python 3.13** (la versión con la que se serializó el modelo). No hay secretos.
+4. **Deploy** y esperar la instalación (unos minutos; el registro se ve en *Manage app*).
+5. **Compartir:** como el repositorio es privado, la app nace privada. Desde **Share**, invitar
+   el correo del profesor o, si la opción está disponible, hacerla pública: la app no contiene
+   datos de estudiantes, solo el modelo y su contrato.
+
+Cada `push` a `main` redespliega la app automáticamente. Simulación local equivalente (entorno
+limpio, lanzado desde la raíz como lo hace Community Cloud):
+
+```bash
+python -m venv .cloudenv && .cloudenv/Scripts/pip install -r deploy/app/requirements.txt
+.cloudenv/Scripts/streamlit run deploy/app/main.py
+```
+
+## 3. Desplegar en Google Cloud (alternativa vista en clase)
 
 Pasos de la guía de clase adaptados a este proyecto. Todo se hace desde el navegador
 (Cloud Console y el botón **SSH** de la VM); no hace falta instalar `gcloud`.
@@ -68,7 +99,7 @@ Pasos de la guía de clase adaptados a este proyecto. Todo se hace desde el nave
 
 Costo de referencia: una `e2-small` cuesta del orden de USD 0,50 al día mientras existe.
 
-## 3. Pruebas de aceptación
+## 4. Pruebas de aceptación (Docker)
 
 | ID | Prueba | Criterio | Local (Docker Desktop) | VM |
 |---|---|---|---|---|
@@ -94,7 +125,7 @@ r=json.load(open('artifacts/reference_prediction.json')); print(predict(m,md,r['
 docker compose down && docker compose up -d && docker compose ps                # A9
 ```
 
-## 4. Coherencia entre entrenamiento y uso
+## 5. Coherencia entre entrenamiento y uso
 
 - **Mismas versiones:** `requirements.txt` fija las versiones con las que se entrenó el modelo
   (`pyproject.toml`), y la prueba de paridad lo verifica en cada entorno.
