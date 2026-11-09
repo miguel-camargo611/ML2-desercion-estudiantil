@@ -389,3 +389,66 @@ def eda_correlation(corr: pd.DataFrame, path: Path) -> Path:
     cb.ax.tick_params(labelsize=7)
     cb.outline.set_visible(False)
     return _save(fig, path)
+
+
+# ------------------------------------------------------------------ entrega final
+def final_test(capture: pd.DataFrame, calib: pd.DataFrame, tiers: pd.DataFrame,
+               path: Path) -> Path:
+    """Prueba sellada: (a) curva de captura con los niveles de riesgo; (b) calibración."""
+    fig, (a, b) = plt.subplots(1, 2, figsize=(9.2, 3.6))
+    a.plot(capture["fraccion_alertada"], capture["fraccion_desertores"], color=BLUE, lw=2,
+           label="LightGBM")
+    a.plot([0, 1], [0, 1], color=GRAY, lw=1.2, ls="--", label="Azar")
+    alto = tiers.loc[tiers.nivel == "Alto"].iloc[0]
+    alerta = tiers.loc[tiers.nivel.isin(["Alto", "Medio"])]
+    for x, y, txt in [(alto.pct_estudiantes, alto.pct_desertores, "Alto"),
+                      (alerta.pct_estudiantes.sum(), alerta.pct_desertores.sum(),
+                       "Alto + medio")]:
+        a.scatter([x], [y], color=ORANGE, s=36, zorder=3)
+        a.annotate(f"{txt}: {_num(100 * x, 0)} % → {_num(100 * y, 0)} %", (x, y),
+                   xytext=(8, -14), textcoords="offset points", fontsize=8, color=INK)
+    a.set_xlabel("Estudiantes alertados (de mayor a menor riesgo)")
+    a.set_ylabel("Desertores detectados")
+    a.set_xlim(0, 1)
+    a.set_ylim(0, 1.02)
+    a.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    a.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    a.legend(loc="lower right", fontsize=8)
+    a.set_title("(a) Captura de desertores")
+
+    err = np.vstack([calib["tasa_observada"] - calib["ic_bajo"],
+                     calib["ic_alto"] - calib["tasa_observada"]])
+    lim = float(max(calib["ic_alto"].max(), calib["prob_media"].max())) * 1.08
+    b.plot([0, lim], [0, lim], color=GRAY, lw=1.2, ls="--", label="Calibración perfecta")
+    b.errorbar(calib["prob_media"], calib["tasa_observada"], yerr=err, fmt="o", color=BLUE,
+               ms=5, capsize=2, lw=1, label="Deciles de riesgo (IC 95 %)")
+    b.set_xlim(0, lim)
+    b.set_ylim(0, lim)
+    b.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    b.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    b.set_xlabel("Probabilidad estimada (media del decil)")
+    b.set_ylabel("Deserción observada")
+    b.legend(loc="upper left", fontsize=8)
+    b.set_title("(b) Calibración")
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def final_shap(direction: pd.DataFrame, path: Path, top: int = 10) -> Path:
+    """Importancia SHAP del modelo final en prueba, con la dirección de las numéricas."""
+    t = direction.head(top).iloc[::-1]
+    labels = []
+    for r in t.itertuples():
+        if np.isnan(r.spearman_valor_shap):
+            arrow = " (categórica)"
+        else:
+            arrow = (" · a mayor valor, más riesgo" if r.spearman_valor_shap > 0
+                     else " · a mayor valor, menos riesgo")
+        labels.append(f"{r.etiqueta}{arrow}")
+    fig, ax = plt.subplots(figsize=(6.4, 0.3 * len(t) + 0.9))
+    ax.barh(labels, t["shap_abs_medio"], color=BLUE, height=0.62)
+    ax.set_xlabel("Importancia: |SHAP| medio en prueba (log-odds)")
+    ax.grid(axis="y", visible=False)
+    ax.tick_params(axis="y", labelsize=8)
+    fig.tight_layout()
+    return _save(fig, path)

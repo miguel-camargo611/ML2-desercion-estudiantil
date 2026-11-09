@@ -221,3 +221,79 @@ def export_artifacts(fit: dict, dev: pd.DataFrame, test_metrics: pd.DataFrame, o
     (out / "reference_prediction.json").write_text(json.dumps(reference, indent=2,
                                                               ensure_ascii=False), encoding="utf-8")
     log.info("Artefactos en %s (referencia: p = %.4f)", out, prob)
+
+
+# ---------------------------------------------- lectura de la evaluación en prueba
+# Estas funciones solo DESCRIBEN el resultado ya obtenido en prueba (no se toma ninguna
+# decisión de modelado con ellas): niveles de riesgo, errores y dirección de cada variable.
+def risk_tiers(score: np.ndarray, metadata: dict) -> np.ndarray:
+    """Mismos niveles que la app: Alto = 20 % de mayor riesgo; Medio = supera el umbral F2."""
+    p80, thr = metadata["risk_percentiles"][79], metadata["decision_threshold"]
+    return np.where(score >= p80, "Alto", np.where(score >= thr, "Medio", "Bajo"))
+
+
+def tier_summary(y: np.ndarray, score: np.ndarray, metadata: dict) -> pd.DataFrame:
+    tiers = risk_tiers(score, metadata)
+    rows = []
+    for t in ("Alto", "Medio", "Bajo"):
+        m = tiers == t
+        rows.append({"nivel": t, "estudiantes": int(m.sum()), "pct_estudiantes": m.mean(),
+                     "tasa_desercion": y[m].mean() if m.any() else np.nan,
+                     "desertores": int(y[m].sum()), "pct_desertores": y[m].sum() / y.sum()})
+    return pd.DataFrame(rows)
+
+
+def confusion_summary(y: np.ndarray, score: np.ndarray, threshold: float) -> pd.DataFrame:
+    pred = score >= threshold
+    tp, fp = int((pred & (y == 1)).sum()), int((pred & (y == 0)).sum())
+    fn, tn = int((~pred & (y == 1)).sum()), int((~pred & (y == 0)).sum())
+    return pd.DataFrame([{"vp": tp, "fp": fp, "fn": fn, "vn": tn, "alertas": tp + fp,
+                          "recall": tp / (tp + fn), "precision": tp / (tp + fp),
+                          "alertas_por_desertor_detectado": (tp + fp) / tp}])
+
+
+def errors_by_group(test: pd.DataFrame, score: np.ndarray, threshold: float,
+                    cols: list[str], min_dropouts: int = 15) -> pd.DataFrame:
+    """Recall y tasa de alerta por grupo (solo grupos con suficientes desertores)."""
+    d = test.assign(score=score, pred=(score >= threshold).astype(int))
+    rows = []
+    for col in cols:
+        for value, g in d.groupby(col):
+            if g[TARGET].sum() < min_dropouts:
+                continue
+            rows.append({"variable": col, "grupo": value, "n": len(g),
+                         "desertores": int(g[TARGET].sum()), "tasa_desercion": g[TARGET].mean(),
+                         "recall": g.loc[g[TARGET] == 1, "pred"].mean(),
+                         "tasa_alerta": g["pred"].mean()})
+    return pd.DataFrame(rows)
+
+
+def shap_direction(model, X: pd.DataFrame, groups: dict[str, str], num: list[str]) -> pd.DataFrame:
+    """Importancia (media |SHAP|) y dirección: correlación de Spearman entre valor y SHAP."""
+    sv = shap_by_variable(model, X, groups)
+    rows = []
+    for var in sv.abs().mean().sort_values(ascending=False).index:
+        rho = (pd.Series(sv[var]).corr(X[var].astype(float), method="spearman")
+               if var in num else np.nan)
+        rows.append({"variable": var, "etiqueta": VAR_LABELS.get(var, var),
+                     "shap_abs_medio": float(sv[var].abs().mean()), "spearman_valor_shap": rho})
+    return pd.DataFrame(rows)
+
+
+def capture_curve(y: np.ndarray, score: np.ndarray) -> pd.DataFrame:
+    """% de desertores detectados al alertar al k % de estudiantes con mayor riesgo."""
+    order = np.argsort(-score, kind="stable")
+    captured = np.cumsum(y[order]) / y.sum()
+    frac = np.arange(1, len(y) + 1) / len(y)
+    return pd.DataFrame({"fraccion_alertada": frac, "fraccion_desertores": captured})
+
+
+def calibration_deciles(y: np.ndarray, score: np.ndarray, bins: int = 10) -> pd.DataFrame:
+    from desercion.eda import wilson
+
+    d = pd.DataFrame({"y": y, "p": score})
+    d["bin"] = pd.qcut(d["p"], bins, labels=False, duplicates="drop")
+    c = d.groupby("bin").agg(prob_media=("p", "mean"), tasa_observada=("y", "mean"),
+                             desertores=("y", "sum"), n=("y", "size")).reset_index()
+    c["ic_bajo"], c["ic_alto"] = wilson(c["desertores"], c["n"])
+    return c

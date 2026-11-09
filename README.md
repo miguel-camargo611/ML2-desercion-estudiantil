@@ -11,7 +11,7 @@ latinoamericanos: el *Student Dropout Dataset* del Tecnológico de Monterrey (Al
 |---|---|---|
 | Primera | Comprensión del artículo y planteamiento | [`reports/primera_entrega/`](reports/primera_entrega/primera_entrega.pdf) |
 | Segunda | Datos, modelamiento y validación | [`reports/segunda_entrega/`](reports/segunda_entrega/segunda_entrega.pdf) |
-| Final | Consolidación, despliegue (Streamlit) y comunicación | *en curso* · app en [`deploy/`](deploy/) |
+| Final | Consolidación, despliegue (Streamlit) y comunicación | [`informe`](reports/entrega_final/entrega_final.pdf) · [`diapositivas`](reports/entrega_final/sustentacion/diapositivas.pdf) · [`guion`](reports/entrega_final/sustentacion/guion.md) · [app](https://desercion-tec.streamlit.app/) |
 
 ## Problema
 

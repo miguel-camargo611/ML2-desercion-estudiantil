@@ -1,0 +1,24 @@
+variable,etiqueta,shap_abs_medio,spearman_valor_shap
+average.first.period,Promedio del 1.er semestre,0.2500628717748302,-0.9156113049988254
+scholarship.perc,% de beca,0.24248609387429287,-0.9023920909512486
+PNA,Promedio de bachillerato,0.12159171736877158,-0.8126566968696168
+region,Región del campus,0.10383816591408375,
+school,Escuela,0.07883139401300246,
+father.education.summary,Educación del padre,0.07422063208418542,
+age,Edad,0.06934488559424362,0.7015282845492604
+program,Programa,0.06229347427042516,
+brecha.promedio,Brecha promedio 1.er sem. − bachillerato,0.04989695667403515,-0.610796236410177
+school.cost,Costo del colegio de origen,0.049210304255560056,
+general.math.eval,Nota de matemáticas (admisión),0.04829262205753986,-0.7468757904911542
+admission.test,Examen de admisión (presencial),0.047121475313827425,-0.19883822616999539
+FTE,Carga académica,0.04556192132765477,-0.32196419640859403
+admission.rubric,Rúbrica de admisión,0.040752368833914636,-0.8736340417960575
+gender,Género,0.03870366732851159,
+max.degree.parents,Máximo grado de los padres,0.033150850373290214,
+english.evaluation,Nivel de inglés,0.02661087730398956,0.21050821137917447
+mother.education.summary,Educación de la madre,0.01920351600478868,
+scholarship.type,Tipo de beca,0.016730259879079983,
+parents.exatec,Padres exalumnos del Tec,0.007015133323633758,
+loan.perc,% de crédito,0.006750088628067407,0.27342241252934996
+dropped.subject.first.period,Materias retiradas (1.er sem.),0.0063121250514084955,0.17680464945932137
+failed.subject.first.period,Materias reprobadas (1.er sem.),0.004933979853026153,0.2810912844366572

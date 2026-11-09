@@ -37,7 +37,7 @@ CSS = f"""
   background-attachment: fixed;
 }}
 [data-testid="stHeader"] {{ background: transparent; }}
-[data-testid="stMainBlockContainer"] {{ padding-top: 2.2rem; max-width: 1280px; }}
+[data-testid="stMainBlockContainer"] {{ padding-top: 2.2rem; max-width: 1480px; }}
 h1, h2, h3, h4 {{ color: {INK} !important; letter-spacing: -0.02em; }}
 p, li, label, .stMarkdown {{ color: {INK_2}; }}
 
@@ -150,11 +150,13 @@ def hero(title: str, subtitle: str, chips: list[tuple[str, str]]) -> str:
             f"<div>{chip_html}</div>")
 
 
-def kpi(label: str, value: str, sub: str = "", icon: str = "", tone: str = "violet") -> str:
+def kpi(label: str, value: str, sub: str = "", icon: str = "", tone: str = "violet",
+        small: bool = False) -> str:
     icon_html = (f'<div class="kpi-icon" style="background:{_ICON_BG[tone]}">{icon}</div>'
                  if icon else "")
+    size = ' style="font-size:1.45rem"' if small else ""  # columnas angostas (ficha)
     return (f'{icon_html}<div class="kpi-label">{esc(label)}</div>'
-            f'<div class="kpi-value">{esc(value)}</div><div class="kpi-sub">{esc(sub)}</div>')
+            f'<div class="kpi-value"{size}>{esc(value)}</div><div class="kpi-sub">{esc(sub)}</div>')
 
 
 def badge(tier: str) -> str:

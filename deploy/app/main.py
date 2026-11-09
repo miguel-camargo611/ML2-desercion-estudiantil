@@ -135,10 +135,10 @@ def student_result(values: dict, result: dict, key: str) -> None:
         a, b = st.columns(2)
         with a:
             html(theme.kpi("Percentil de riesgo", str(result["percentile"]),
-                           f"mayor que el {result['percentile']} % de estudiantes"))
+                           f"mayor que el {result['percentile']} % de estudiantes", small=True))
         with b:
             html(theme.kpi("Acción sugerida", theme.TIER_SHORT[tier],
-                           theme.TIER_ACTION[tier]))
+                           theme.TIER_ACTION[tier], small=True))
         html(f'<div class="note">Promedio de deserción en los datos: {pct(m["prevalencia"])} · '
              f'umbral validado: {pct(metadata["decision_threshold"])}</div>')
     with st.container(key=f"card-why-{key}"):
@@ -185,8 +185,8 @@ with st.sidebar:
          f'Umbral F2: {metadata["decision_threshold"]:.3f}<br>'
          f"Demostración académica: no usar para decisiones reales.</div>")
 
-tab_one, tab_batch, tab_model = st.tabs(["👤  Un estudiante", "📂  Carga de archivo",
-                                         "📊  Sobre el modelo"])
+tab_batch, tab_one, tab_model = st.tabs(["📊  Panel del grupo", "👤  Un estudiante",
+                                         "🧭  Sobre el modelo"])
 
 # ------------------------------------------------------------- 1. un estudiante
 with tab_one:
@@ -240,23 +240,38 @@ with tab_batch:
         with st.expander("Columnas y valores admitidos"):
             st.dataframe(column_guide(), hide_index=True, width="stretch")
 
+    # Sin archivo, el tablero se muestra con 40 estudiantes FICTICIOS para que se vea completo.
     if upload is None:
-        with st.container(key="glass-empty-batch"):
-            html(theme.empty_state("📂", "Suba un archivo para ver el tablero del grupo. "
-                                         "¿Sin datos a mano? Descargue el ejemplo ficticio."))
+        raw = example_batch(metadata, n=40).astype(str)
+        html('<div class="note" style="margin:0 0 .6rem">Mostrando 40 estudiantes '
+             "<b>ficticios</b> de ejemplo. Suba su archivo para reemplazarlos.</div>")
     else:
         try:
             raw = read_upload(upload)
-            results = predict_batch(model, metadata, raw)
         except ValueError as error:
-            st.error(f"El archivo no se puede evaluar: {error}")
+            st.error(f"El archivo no se puede leer: {error}")
             st.stop()
-        ok = results["error"] == ""
-        n_ok = int(ok.sum())
-        high = int((results["nivel_riesgo"] == "Alto").sum())
-        alerts = int((results["alerta"] == "Priorizar acompañamiento").sum())
-        mean_p = results.loc[ok, "probabilidad"].mean() if n_ok else float("nan")
+    try:
+        results = predict_batch(model, metadata, raw)
+    except ValueError as error:
+        st.error(f"El archivo no se puede evaluar: {error}")
+        st.stop()
+    ok = results["error"] == ""
+    n_ok = int(ok.sum())
+    high = int((results["nivel_riesgo"] == "Alto").sum())
+    alerts = int((results["alerta"] == "Priorizar acompañamiento").sum())
+    mean_p = results.loc[ok, "probabilidad"].mean() if n_ok else float("nan")
+    id_col = "id_estudiante" if "id_estudiante" in results else None
+    if id_col is None:
+        results.insert(0, "fila", range(2, len(results) + 2))  # fila como en Excel
+        id_col = "fila"
+    ranked = results[ok].sort_values("probabilidad", ascending=False).copy()
+    ranked["nivel"] = ranked["nivel_riesgo"].map(TIER_EMOJI)
+    ranked["accion"] = ranked["nivel_riesgo"].map(theme.TIER_SHORT)
 
+    # Tablero del grupo a la izquierda; ficha del estudiante elegido a la derecha.
+    board, side = st.columns([2.15, 1], gap="medium")
+    with board:
         k = st.columns(4)
         cards = [
             ("Evaluados", f"{n_ok:,}".replace(",", "."), f"de {len(results)} filas", "👥",
@@ -282,16 +297,7 @@ with tab_batch:
                                    "Probabilidad estimada; la línea punteada es la tasa promedio"))
                 altair(charts.probability_histogram(results, m["prevalencia"]))
 
-            id_col = "id_estudiante" if "id_estudiante" in results else None
-            if id_col is None:
-                results.insert(0, "fila", range(2, len(results) + 2))  # fila como en Excel
-                id_col = "fila"
-            ranked = results[ok].sort_values("probabilidad", ascending=False).copy()
-            ranked["nivel"] = ranked["nivel_riesgo"].map(TIER_EMOJI)
-            ranked["accion"] = ranked["nivel_riesgo"].map(theme.TIER_SHORT)
-
-            w1, w2 = st.columns([1.6, 1], gap="medium")
-            with w1, st.container(key="card-watchlist"):
+            with st.container(key="card-watchlist"):
                 html(theme.section("Lista priorizada", "Ordenada de mayor a menor riesgo"))
                 st.dataframe(
                     ranked[[id_col, "nivel", "probabilidad", "percentil_riesgo", "accion",
@@ -313,32 +319,30 @@ with tab_batch:
                     })
                 st.download_button("⬇ Descargar resultados (CSV)", to_csv(results),
                                    "resultados_riesgo.csv", "text/csv")
-            with w2, st.container(key="card-drivers"):
+            with st.container(key="card-drivers"):
                 html(theme.section("Qué pesa más en este grupo",
                                    "Media del |SHAP| por variable"))
                 altair(charts.importance_bars(group_drivers(model, metadata, raw), "importancia"))
 
-            with st.container(key="card-drill"):
-                html(theme.section("Ficha de un estudiante", "Elija un estudiante de la lista"))
+    with side:
+        if n_ok:
+            with st.container(key="card-pick"):
+                html(theme.section("Ficha del estudiante", "Por defecto, el de mayor riesgo"))
                 chosen = st.selectbox("Estudiante", ranked[id_col].astype(str).tolist(),
                                       label_visibility="collapsed")
-                row = ranked[ranked[id_col].astype(str) == chosen].iloc[0]
-                vals = raw.reset_index(drop=True).loc[row.name,
-                                                      metadata["input_features"]].to_dict()
-                s1, s2 = st.columns([1, 1.3], gap="medium")
-                with s1:
-                    student_result(vals, predict(model, metadata, vals), key="batch")
-                with s2:
-                    html(theme.section("Datos registrados"))
-                    shown = {contract[f]["label"]: ES.get(str(v), v) for f, v in vals.items()}
-                    st.dataframe(pd.Series(shown, name="valor").astype(str), height=520,
-                                 width="stretch")
+            row = ranked[ranked[id_col].astype(str) == chosen].iloc[0]
+            vals = raw.reset_index(drop=True).loc[row.name, metadata["input_features"]].to_dict()
+            student_result(vals, predict(model, metadata, vals), key="batch")
+            with st.expander("Datos registrados del estudiante"):
+                shown = {contract[f]["label"]: ES.get(str(v), v) for f, v in vals.items()}
+                st.dataframe(pd.Series(shown, name="valor").astype(str), width="stretch")
+        else:
+            with st.container(key="glass-empty-batch"):
+                html(theme.empty_state("⚠️", "Ninguna fila es válida: revise los errores."))
 
-        if (~ok).any():
-            with st.expander(f"⚠️ Filas con error ({int((~ok).sum())})"):
-                id_err = "id_estudiante" if "id_estudiante" in results else "fila"
-                st.dataframe(results.loc[~ok, [id_err, "error"]], hide_index=True,
-                             width="stretch")
+    if (~ok).any():
+        with st.expander(f"⚠️ Filas con error ({int((~ok).sum())})"):
+            st.dataframe(results.loc[~ok, [id_col, "error"]], hide_index=True, width="stretch")
 
 # ------------------------------------------------------------- 3. sobre el modelo
 with tab_model:

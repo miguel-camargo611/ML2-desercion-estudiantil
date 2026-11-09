@@ -349,8 +349,46 @@ def cmd_final(args) -> None:
     log.info("Prueba: %s", metrics.set_index("metrica")["valor"].round(3).to_dict())
 
 
+def cmd_final_report(args) -> None:
+    """Describe la evaluación ya hecha en prueba (sin decidir nada con ella): tablas y figuras."""
+    import json
+
+    import joblib
+
+    t, f = _tables(), _figures()
+    art = config.path("deploy_artifacts")
+    model = joblib.load(art / "model.joblib")
+    metadata = json.loads((art / "model_metadata.json").read_text(encoding="utf-8"))
+    df = data.load_clean()
+    test = add_engineered(data.study_frame(df, data.get_split(df), "test"))
+    num, cat = feature_lists()
+    X = test[num + cat]
+    y, score = test[data.TARGET].to_numpy(), model.predict_proba(X)[:, 1]
+    thr = metadata["decision_threshold"]
+    tiers = final.tier_summary(y, score, metadata)
+    tiers.to_csv(t / "prueba_niveles.csv", index=False)
+    final.confusion_summary(y, score, thr).to_csv(t / "prueba_confusion.csv", index=False)
+    final.errors_by_group(test, score, thr, ["scholarship.type", "school", "region",
+                                             "generation"]).to_csv(t / "prueba_errores.csv",
+                                                                   index=False)
+    direction = final.shap_direction(model, X, metadata["shap_groups"], num)
+    direction.to_csv(t / "prueba_shap_direccion.csv", index=False)
+    calib = final.calibration_deciles(y, score)
+    calib.to_csv(t / "prueba_calibracion.csv", index=False)
+    plots.final_test(final.capture_curve(y, score), calib, tiers, f / "fig09_prueba_final.png")
+    plots.final_shap(direction, f / "fig10_shap_final.png")
+    # Modelo final frente a los demás (t corregida de Nadeau-Bengio sobre los pliegues externos).
+    folds, n_dev = _folds(), len(_dev())
+    rivals = ["CatBoost", "XGBoost", "Gradient Boosting", "SVM (RBF-Nystroem)", "Random Forest",
+              "Regresión logística"]
+    pd.DataFrame([evaluate.compare_models(folds, FINAL_MODEL, r, "pr_auc", n_dev - n_dev // 5,
+                                          n_dev // 5) for r in rivals]).to_csv(
+        t / "pruebas_modelo_final.csv", index=False)
+    log.info("Lectura de la prueba lista: %s", tiers.round(3).to_dict("records"))
+
+
 STEPS = ["prepare", "eda", "select", "train", "compare", "experiments", "interpret", "figures",
-         "report", "final"]
+         "report", "final", "final_report"]
 
 
 def cmd_all(args) -> None:
